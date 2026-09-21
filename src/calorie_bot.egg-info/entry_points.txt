@@ -1,0 +1,2 @@
+[console_scripts]
+calorie-bot = calorie_bot.bot.app:run

@@ -1,0 +1,15 @@
+# Agent framework + Gemini support
+pydantic-ai-slim[google]>=1.0.0
+
+# Telegram transport
+python-telegram-bot[rate-limiter]>=21.6
+
+# Database
+asyncpg>=0.30.0
+
+# Models & config
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+
+# Timezones on Windows / slim containers
+tzdata>=2024.1

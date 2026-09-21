@@ -1,0 +1,22 @@
+[project]
+name = "calorie-bot"
+version = "1.0.0"
+description = "Multi-user calorie and recipe tracker on PydanticAI, Supabase and Telegram"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+calorie-bot = "calorie_bot.bot.app:run"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+calorie_bot = ["db/*.sql"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

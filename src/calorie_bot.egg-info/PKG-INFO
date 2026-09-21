@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: calorie-bot
+Version: 1.0.0
+Summary: Multi-user calorie and recipe tracker on PydanticAI, Supabase and Telegram
+Requires-Python: >=3.11
+Requires-Dist: pydantic-ai-slim[google]>=1.0.0
+Requires-Dist: python-telegram-bot[rate-limiter]>=21.6
+Requires-Dist: asyncpg>=0.30.0
+Requires-Dist: pydantic>=2.9.0
+Requires-Dist: pydantic-settings>=2.5.0
+Requires-Dist: tzdata>=2024.1

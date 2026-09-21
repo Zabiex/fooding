@@ -1,0 +1,6 @@
+pydantic-ai-slim[google]>=1.0.0
+python-telegram-bot[rate-limiter]>=21.6
+asyncpg>=0.30.0
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+tzdata>=2024.1
