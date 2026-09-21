@@ -27,4 +27,3 @@ coverage.xml
 
 # Local secrets
 .env
-.env.*
