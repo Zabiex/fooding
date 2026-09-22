@@ -9,3 +9,4 @@ Requires-Dist: asyncpg>=0.30.0
 Requires-Dist: pydantic>=2.9.0
 Requires-Dist: pydantic-settings>=2.5.0
 Requires-Dist: tzdata>=2024.1
+Requires-Dist: aiohttp

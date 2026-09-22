@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram import BotCommand
@@ -37,10 +38,21 @@ def build_application(settings: Settings | None = None) -> Application:
     settings = settings or get_settings()
 
     async def post_init(application: Application) -> None:
-        pool = await create_pool(settings)
+        logger.info("post_init: starting application initialization")
+        try:
+            # Fail fast if DB pool creation blocks (e.g. network issues).
+            pool = await asyncio.wait_for(create_pool(settings), timeout=15)
+        except asyncio.TimeoutError:
+            logger.exception("Timed out while creating database pool in post_init")
+            raise
+        except Exception:
+            logger.exception("Failed to create database pool in post_init")
+            raise
+
         application.bot_data[_POOL_KEY] = pool
 
         if settings.run_schema_init_on_startup:
+            logger.info("post_init: initializing DB schema")
             await initialize_schema(pool)
 
         repos = Repositories.from_pool(pool)
@@ -58,6 +70,8 @@ def build_application(settings: Settings | None = None) -> Application:
             runner=runner,
             default_timezone=settings.default_timezone,
         )
+
+        logger.info("post_init: services populated in bot_data")
 
         await application.bot.set_my_commands(BOT_COMMANDS)
         me = await application.bot.get_me()

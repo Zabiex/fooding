@@ -10,7 +10,6 @@ import signal
 from aiohttp import web
 
 from calorie_bot.bot.app import build_application, register_handlers
-from calorie_bot.bot.handlers import BOT_SERVICES_KEY
 
 
 async def handle_healthcheck(request: web.Request) -> web.Response:
@@ -43,33 +42,35 @@ async def main() -> None:
         try:
             loop.add_signal_handler(sig, stop_event.set)
         except NotImplementedError:
-            # Signal handlers aren't implemented on some platforms (e.g. Windows)
             pass
 
-    # 3. Lifecycle management for PTB and aiohttp with graceful cleanup
+    # 3. Explicit PTB Lifecycle Execution
     try:
-        # `async with application` calls initialize() and shutdown() automatically
-        async with application:
-            # Ensure post_init has run and populated `bot_data` before polling.
-            await application.initialize()
+        # Step A: Initialize the application internals
+        await application.initialize()
 
-            # Wait a short while for post_init to populate the services entry.
-            for _ in range(300):  # up to 30s
-                if BOT_SERVICES_KEY in application.bot_data:
-                    break
-                await asyncio.sleep(0.1)
+        # Step B: Explicitly await post_init hook (populates bot_data['services'] and DB pool)
+        if application.post_init:
+            await application.post_init(application)
 
-            await application.start()
-            await application.updater.start_polling()
+        # Step C: Start application & start polling for updates
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        print("Telegram bot started successfully and listening for messages.")
 
-            # Wait until SIGINT or SIGTERM is received
-            await stop_event.wait()
+        # Block until SIGINT or SIGTERM is received
+        await stop_event.wait()
 
-            # Gracefully stop polling updates and stop the application
-            await application.updater.stop()
-            await application.stop()
     finally:
-        # Gracefully shut down the aiohttp healthcheck server
+        print("Shutting down bot...")
+        # Step D: Graceful stop sequence
+        if application.updater and application.updater.running:
+            await application.updater.stop()
+        if application.running:
+            await application.stop()
+        await application.shutdown()
+
+        # Step E: Gracefully shut down aiohttp healthcheck server
         await runner.cleanup()
         print("Shutdown complete.")
 

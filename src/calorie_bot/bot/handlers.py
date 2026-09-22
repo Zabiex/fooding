@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 BOT_SERVICES_KEY = "services"
 
 
+class BotStartingError(RuntimeError):
+    """Raised when handlers are invoked before `application.bot_data["services"]` is populated."""
+
+
 @dataclass
 class BotServices:
     """Everything the handlers need, parked in `application.bot_data`."""
@@ -47,7 +51,10 @@ class BotServices:
 
 
 def _services(context: ContextTypes.DEFAULT_TYPE) -> BotServices:
-    services = context.application.bot_data[BOT_SERVICES_KEY]
+    services = context.application.bot_data.get(BOT_SERVICES_KEY)
+    if services is None:
+        logger.debug("Bot services not available yet in application.bot_data")
+        raise BotStartingError("Bot is still starting; try again in a moment")
     assert isinstance(services, BotServices)
     return services
 
@@ -276,6 +283,17 @@ async def document_photo_handler(update: Update, context: ContextTypes.DEFAULT_T
 # Errors
 # =============================================================================
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Handle benign startup case without a full stack trace.
+    if isinstance(context.error, BotStartingError):
+        if isinstance(update, Update) and update.effective_message:
+            try:
+                await update.effective_message.reply_text(
+                    "I'm still starting up — please try again in a moment."
+                )
+            except Exception:
+                logger.debug("Failed to send startup message to user.")
+        return
+
     logger.exception("Unhandled error while processing update", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
         try:
