@@ -10,6 +10,7 @@ import signal
 from aiohttp import web
 
 from calorie_bot.bot.app import build_application, register_handlers
+from calorie_bot.bot.handlers import BOT_SERVICES_KEY
 
 
 async def handle_healthcheck(request: web.Request) -> web.Response:
@@ -49,6 +50,15 @@ async def main() -> None:
     try:
         # `async with application` calls initialize() and shutdown() automatically
         async with application:
+            # Ensure post_init has run and populated `bot_data` before polling.
+            await application.initialize()
+
+            # Wait a short while for post_init to populate the services entry.
+            for _ in range(300):  # up to 30s
+                if BOT_SERVICES_KEY in application.bot_data:
+                    break
+                await asyncio.sleep(0.1)
+
             await application.start()
             await application.updater.start_polling()
 
