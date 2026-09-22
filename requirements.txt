@@ -13,3 +13,4 @@ pydantic-settings>=2.5.0
 
 # Timezones on Windows / slim containers
 tzdata>=2024.1
+aiohttp
