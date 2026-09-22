@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # --- Google / Gemini -----------------------------------------------------
     google_api_key: SecretStr = Field(..., alias="GOOGLE_API_KEY")
+    # OpenRouter API key (optional) — when set the app will prefer OpenRouter
+    openrouter_api_key: SecretStr | None = Field(None, alias="OPENROUTER_API_KEY")
     # Use the provider-prefixed model name supported by the API client.
     # The previous default 'gemini-1.5-flash' may not be available for v1beta.
     gemini_model: str = Field("google:gemini-3.5-flash", alias="GEMINI_MODEL")

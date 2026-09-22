@@ -10,3 +10,8 @@ Requires-Dist: pydantic>=2.9.0
 Requires-Dist: pydantic-settings>=2.5.0
 Requires-Dist: tzdata>=2024.1
 Requires-Dist: aiohttp
+Requires-Dist: tenacity
+Requires-Dist: requests
+Requires-Dist: python-dotenv
+Requires-Dist: httpx
+Requires-Dist: openai

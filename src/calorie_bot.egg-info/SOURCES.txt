@@ -11,6 +11,7 @@ src/calorie_bot.egg-info/top_level.txt
 src/calorie_bot/agent/dependencies.py
 src/calorie_bot/agent/history.py
 src/calorie_bot/agent/nutrition_agent.py
+src/calorie_bot/agent/openrouter_model.py
 src/calorie_bot/agent/prompts.py
 src/calorie_bot/agent/runner.py
 src/calorie_bot/agent/tools.py
@@ -22,6 +23,7 @@ src/calorie_bot/db/repositories.py
 src/calorie_bot/db/schema.py
 src/calorie_bot/db/schema.sql
 src/calorie_bot/domain/models.py
+src/calorie_bot/services/genai.py
 src/calorie_bot/services/nutrition.py
 src/calorie_bot/services/timeframes.py
 tests/test_tools.py

@@ -13,6 +13,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pydantic_ai import BinaryContent, UnexpectedModelBehavior
+from pydantic_ai.exceptions import ModelHTTPError
+
+try:
+    from google.genai.errors import ClientError as GoogleClientError
+except Exception:  # pragma: no cover
+    GoogleClientError = None
 
 try:  # `Usage` was renamed to `RunUsage` in pydantic-ai 1.x
     from pydantic_ai.usage import RunUsage
@@ -106,6 +112,34 @@ class AgentRunner:
                 raise AgentError(
                     "I couldn't make sense of that one. Try describing the food and the portion size."
                 ) from exc
+            except (ModelHTTPError, GoogleClientError) as exc:
+                # Try a local fallback (OpenRouter or fallback models) for transient
+                # quota / rate-limit errors. Only applies for text prompts.
+                logger.warning("Model HTTP error, attempting fallback: %s", exc)
+                try:
+                    from ..services.genai import generate_with_fallback
+
+                    # Determine textual prompt
+                    if isinstance(prompt, str):
+                        text_prompt = prompt
+                    elif isinstance(prompt, list) and prompt and isinstance(prompt[0], str):
+                        text_prompt = prompt[0]
+                    else:
+                        raise
+
+                    # Run the blocking helper in a thread to avoid blocking the event loop
+                    fallback_text = await asyncio.to_thread(generate_with_fallback, text_prompt)
+                    # Create a minimal result-like object to preserve usage=None
+                    class _FallbackResult:
+                        def __init__(self, output: str):
+                            self.output = output
+                            self.usage = None
+                            self.new_messages = lambda: []
+
+                    result = _FallbackResult(fallback_text)
+                except Exception:
+                    logger.exception("Fallback generation failed")
+                    raise AgentError("The model is currently overloaded; try again in a moment.") from exc
 
             # Photo bytes are dropped from history: keeping them re-uploads the
             # image on every subsequent turn and burns tokens for nothing.

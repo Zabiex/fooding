@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from telegram import BotCommand
 from telegram.ext import Application, ApplicationBuilder, Defaults
@@ -56,6 +57,15 @@ def build_application(settings: Settings | None = None) -> Application:
             await initialize_schema(pool)
 
         repos = Repositories.from_pool(pool)
+        # Ensure pydantic-ai's OpenRouter provider can read the API key from
+        # the environment when settings includes an OpenRouter key.
+        try:
+            if getattr(settings, "openrouter_api_key", None):
+                key = settings.openrouter_api_key.get_secret_value()
+                if key:
+                    os.environ.setdefault("OPENROUTER_API_KEY", key)
+        except Exception:
+            logger.debug("No OPENROUTER_API_KEY in settings or failed to read it.")
         runner = AgentRunner(
             agent=build_agent(settings),
             repos=repos,

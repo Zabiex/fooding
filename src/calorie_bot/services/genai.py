@@ -29,11 +29,32 @@ except Exception:  # pragma: no cover - allowed to import at runtime
     APIError = Exception
 import requests
 from requests import RequestException
+from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+# Load project .env into os.environ so values in .env (like OPENROUTER_API_KEY)
+# are visible to `os.getenv` when the process wasn't started with exported vars.
+load_dotenv()
 
 from ..config import get_settings
 
 settings = get_settings()
-client = genai.Client() if genai is not None else None
+
+
+def _get_genai_client():
+    """Lazily construct a google.genai Client if an API key is available.
+
+    Returns None if the google.genai package or API key is missing.
+    """
+    if genai is None:
+        return None
+    try:
+        key = settings.google_api_key.get_secret_value() if getattr(settings, "google_api_key", None) else None
+    except Exception:
+        key = None
+    if not key:
+        return None
+    return genai.Client(api_key=key)
 
 
 def _parse_fallback_models() -> List[str]:
@@ -49,8 +70,10 @@ def _parse_fallback_models() -> List[str]:
     reraise=True,
 )
 def _call_model_with_retry(model: str, prompt: str):
+    client = _get_genai_client()
     if client is None:
-        raise RuntimeError("google.genai client not installed")
+        raise RuntimeError("google.genai client not configured or API key missing")
+
     # The genai client may have different response shapes; this mirrors
     # the simple usage pattern and returns the textual content when possible.
     resp = client.models.generate_content(model=model, contents=prompt)
@@ -139,13 +162,25 @@ def generate_with_fallback(prompt: str) -> str:
         ordered.append(m)
 
     last_exc: Exception | None = None
+    openrouter_available = bool(os.getenv("OPENROUTER_API_KEY"))
+
     for model_name in ordered:
+        # Try OpenRouter first if API key present (supports model ids like 'google/gemini-3.5-flash')
+        if openrouter_available:
+            try:
+                return _call_openrouter(model_name, prompt)
+            except Exception as e:
+                last_exc = e
+                # try next model (or fallback to google client below)
+                # continue to next iteration to prefer OpenRouter for each model
+                continue
+
         try:
-            # If model_name looks like an OpenRouter URL or mentions openrouter, use HTTP path
+            # If model_name looks like an OpenRouter URL, use HTTP path
             if model_name.startswith("http://") or model_name.startswith("https://") or "openrouter.ai" in model_name:
                 return _call_openrouter(model_name, prompt)
 
-            # Prefer the google.genai client path when available
+            # Otherwise try Google GenAI client
             resp = _call_model_with_retry(model_name, prompt)
             # best-effort extract text
             text = getattr(resp, "text", None)

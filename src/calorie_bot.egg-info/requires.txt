@@ -5,3 +5,8 @@ pydantic>=2.9.0
 pydantic-settings>=2.5.0
 tzdata>=2024.1
 aiohttp
+tenacity
+requests
+python-dotenv
+httpx
+openai
