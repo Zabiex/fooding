@@ -70,6 +70,10 @@ class AgentRunner:
         # One in-flight run per user: a second message queues instead of racing.
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
+    @property
+    def max_video_bytes(self) -> int:
+        return self._settings.max_video_bytes
+
     # -- public API -----------------------------------------------------------
     async def run_text(self, user: UserProfile, text: str) -> AgentReply:
         return await self._run(user, text, EntrySource.TEXT)

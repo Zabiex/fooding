@@ -251,7 +251,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     download_instagram_video,
                     instagram_match.group(0).rstrip(".,!?"),
                     str(Path(directory) / "video.mp4"),
-                    max_bytes=services.runner._settings.max_video_bytes,
+                    max_bytes=services.runner.max_video_bytes,
                 )
                 video_bytes = await asyncio.to_thread(Path(video_path).read_bytes)
                 reply = await services.runner.run_video(
