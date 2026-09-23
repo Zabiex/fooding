@@ -169,6 +169,20 @@ class UserRepository:
             raise LookupError(f"User {user_id} does not exist.")
         return _user_from_row(row)
 
+    async def clear_daily_calorie_target(self, user_id: UUID) -> UserProfile:
+        row = await self._pool.fetchrow(
+            """
+            update public.users
+               set daily_calorie_target = null
+             where id = $1
+            returning *
+            """,
+            user_id,
+        )
+        if row is None:
+            raise LookupError(f"User {user_id} does not exist.")
+        return _user_from_row(row)
+
 
 # =============================================================================
 # Recipes

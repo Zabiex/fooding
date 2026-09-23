@@ -110,7 +110,7 @@ WELCOME = (
     "<b>Commands</b>\n"
     "/today — today's log\n"
     "/yesterday — yesterday's log\n"
-    "/target 2200 — set a daily calorie goal\n"
+    "/target 2200 — set a daily calorie goal (or /target off to clear it)\n"
     "/timezone Europe/Helsinki — set your timezone\n"
     "/recipes — your saved recipes\n"
     "/undo — remove the last entry\n"

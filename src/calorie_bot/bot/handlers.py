@@ -135,7 +135,12 @@ async def target_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             if user.daily_calorie_target
             else "You have no daily target set."
         )
-        await _reply(update, f"{current}\nSet one with <code>/target 2200</code>.")
+        await _reply(update, f"{current}\nSet one with <code>/target 2200</code> or clear it with <code>/target off</code>.")
+        return
+
+    if context.args[0].lower() in {"clear", "none", "off"}:
+        await services.repos.users.clear_daily_calorie_target(user.id)
+        await _reply(update, "✅ Daily target cleared.")
         return
 
     try:
