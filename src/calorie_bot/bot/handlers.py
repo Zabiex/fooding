@@ -19,9 +19,11 @@ from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import (
     Application,
+    ApplicationHandlerStop,
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
@@ -39,6 +41,10 @@ BOT_SERVICES_KEY = "services"
 
 class BotStartingError(RuntimeError):
     """Raised when handlers are invoked before `application.bot_data["services"]` is populated."""
+
+
+class UserNotWhitelistedError(PermissionError):
+    """Raised when a Telegram user has not been granted bot access."""
 
 
 @dataclass
@@ -66,7 +72,7 @@ async def _current_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> U
         raise PermissionError("No human sender on this update.")
 
     services = _services(context)
-    return await services.repos.users.upsert_from_telegram(
+    user = await services.repos.users.upsert_from_telegram(
         UserUpsert(
             telegram_user_id=telegram_user.id,
             telegram_chat_id=update.effective_chat.id if update.effective_chat else None,
@@ -75,6 +81,20 @@ async def _current_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> U
             locale=(telegram_user.language_code or "en")[:5],
         )
     )
+    if not user.whitelist:
+        raise UserNotWhitelistedError
+    return user
+
+
+async def whitelist_guard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reject every update from users who have not been granted access."""
+    if update.effective_user is None or update.effective_user.is_bot:
+        return
+    try:
+        await _current_user(update, context)
+    except UserNotWhitelistedError:
+        await _reply(update, "Access has not been enabled for your account yet.")
+        raise ApplicationHandlerStop
 
 
 async def _reply(update: Update, text: str) -> None:
@@ -288,6 +308,9 @@ async def document_photo_handler(update: Update, context: ContextTypes.DEFAULT_T
 # Errors
 # =============================================================================
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if isinstance(context.error, UserNotWhitelistedError):
+        return
+
     # Handle benign startup case without a full stack trace.
     if isinstance(context.error, BotStartingError):
         if isinstance(update, Update) and update.effective_message:
@@ -313,6 +336,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # Registration
 # =============================================================================
 def register_handlers(application: Application) -> None:
+    application.add_handler(TypeHandler(Update, whitelist_guard, block=True), group=-1)
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("today", today_command))
