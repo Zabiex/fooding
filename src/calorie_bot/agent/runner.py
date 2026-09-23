@@ -74,6 +74,11 @@ class AgentRunner:
     def max_video_bytes(self) -> int:
         return self._settings.max_video_bytes
 
+    @property
+    def apify_api_token(self) -> str | None:
+        key = self._settings.apify_api_token
+        return key.get_secret_value() if key else None
+
     # -- public API -----------------------------------------------------------
     async def run_text(self, user: UserProfile, text: str) -> AgentReply:
         return await self._run(user, text, EntrySource.TEXT)

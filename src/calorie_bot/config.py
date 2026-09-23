@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # --- Google / Gemini -----------------------------------------------------
     google_api_key: SecretStr = Field(..., alias="GOOGLE_API_KEY")
+    apify_api_token: SecretStr | None = Field(None, alias="APIFY_API_TOKEN")
     # OpenRouter API key (optional) — when set the app will prefer OpenRouter
     openrouter_api_key: SecretStr | None = Field(None, alias="OPENROUTER_API_KEY")
     # Use the provider-prefixed model name supported by the API client.
