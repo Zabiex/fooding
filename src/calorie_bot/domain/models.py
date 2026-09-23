@@ -195,6 +195,7 @@ class UserProfile(BaseModel):
     protein_target_g: float | None = None
     carbs_target_g: float | None = None
     fat_target_g: float | None = None
+    whitelist: bool = False
     is_active: bool = True
 
     @property

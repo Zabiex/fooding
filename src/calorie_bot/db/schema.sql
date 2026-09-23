@@ -69,10 +69,14 @@ begin
         protein_target_g      real        check (protein_target_g   is null or protein_target_g   >= 0),
         carbs_target_g        real        check (carbs_target_g     is null or carbs_target_g     >= 0),
         fat_target_g          real        check (fat_target_g       is null or fat_target_g       >= 0),
+        whitelist             boolean     not null default false,
         is_active             boolean     not null default true,
         created_at            timestamptz not null default now(),
         updated_at            timestamptz not null default now()
     );
+
+    alter table public.users
+        add column if not exists whitelist boolean not null default false;
 
     create index if not exists users_telegram_user_id_idx
         on public.users (telegram_user_id);

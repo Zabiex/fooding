@@ -59,6 +59,7 @@ def _user_from_row(row: Row) -> UserProfile:
         protein_target_g=row["protein_target_g"],
         carbs_target_g=row["carbs_target_g"],
         fat_target_g=row["fat_target_g"],
+        whitelist=row["whitelist"],
         is_active=row["is_active"],
     )
 
@@ -121,8 +122,8 @@ class UserRepository:
         row = await self._pool.fetchrow(
             """
             insert into public.users
-                (telegram_user_id, telegram_chat_id, username, first_name, locale)
-            values ($1, $2, $3, $4, $5)
+                (telegram_user_id, telegram_chat_id, username, first_name, locale, whitelist)
+            values ($1, $2, $3, $4, $5, false)
             on conflict (telegram_user_id) do update
                 set telegram_chat_id = coalesce(excluded.telegram_chat_id, public.users.telegram_chat_id),
                     username         = coalesce(excluded.username,         public.users.username),
