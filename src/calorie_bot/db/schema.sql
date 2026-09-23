@@ -47,8 +47,10 @@ begin
 
     if not exists (select 1 from pg_type where typname = 'entry_source') then
         create type public.entry_source as enum (
-            'text', 'photo', 'recipe', 'manual'
+            'text', 'photo', 'video', 'recipe', 'manual'
         );
+    else
+        alter type public.entry_source add value if not exists 'video';
     end if;
 
     ---------------------------------------------------------------------------

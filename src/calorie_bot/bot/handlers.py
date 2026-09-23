@@ -12,8 +12,12 @@ content, so every database write is scoped to the sender by construction.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import re
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
@@ -31,12 +35,14 @@ from ..agent.runner import AgentError, AgentRunner
 from ..db.repositories import Repositories
 from ..domain.models import UserProfile, UserTargetsUpdate, UserUpsert
 from ..services.nutrition import build_daily_summary
+from ..services.instagram import download_instagram_video
 from ..services.timeframes import is_valid_timezone, parse_day_offset
 from . import formatting
 
 logger = logging.getLogger(__name__)
 
 BOT_SERVICES_KEY = "services"
+INSTAGRAM_URL = re.compile(r"https?://(?:www\.)?(?:instagram\.com|instagr\.am)/[^\s<>]+", re.IGNORECASE)
 
 
 class BotStartingError(RuntimeError):
@@ -236,6 +242,31 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = await _current_user(update, context)
     services = _services(context)
     await _typing(update, context)
+
+    instagram_match = INSTAGRAM_URL.search(message.text)
+    if instagram_match:
+        try:
+            with tempfile.TemporaryDirectory(prefix="calorie-bot-") as directory:
+                video_path = await asyncio.to_thread(
+                    download_instagram_video,
+                    instagram_match.group(0).rstrip(".,!?"),
+                    str(Path(directory) / "video.mp4"),
+                    max_bytes=services.runner._settings.max_video_bytes,
+                )
+                video_bytes = await asyncio.to_thread(Path(video_path).read_bytes)
+                reply = await services.runner.run_video(
+                    user, video_bytes, caption=message.text
+                )
+        except AgentError as exc:
+            await _reply(update, formatting.e(str(exc)))
+            return
+        except Exception:
+            logger.exception("Instagram video processing failed")
+            await _reply(update, "I couldn't download that Instagram video. Check the link and try again.")
+            return
+
+        await _reply(update, formatting.e(reply.text))
+        return
 
     try:
         reply = await services.runner.run_text(user, message.text)

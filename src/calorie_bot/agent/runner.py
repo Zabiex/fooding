@@ -31,7 +31,12 @@ from ..domain.models import EntrySource, UserProfile
 from .dependencies import AgentDeps
 from .history import ConversationStore
 from .nutrition_agent import NutritionAgent
-from .prompts import PHOTO_PROMPT, PHOTO_PROMPT_WITH_CAPTION
+from .prompts import (
+    PHOTO_PROMPT,
+    PHOTO_PROMPT_WITH_CAPTION,
+    VIDEO_PROMPT,
+    VIDEO_PROMPT_WITH_CAPTION,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +93,24 @@ class AgentRunner:
         prompt = [prompt_text, BinaryContent(data=image_bytes, media_type=media_type)]
         return await self._run(user, prompt, EntrySource.PHOTO)
 
+    async def run_video(
+        self,
+        user: UserProfile,
+        video_bytes: bytes,
+        *,
+        caption: str | None = None,
+    ) -> AgentReply:
+        if len(video_bytes) > self._settings.max_video_bytes:
+            raise AgentError("That video is too large for me to process. Try a shorter video.")
+
+        prompt_text = (
+            VIDEO_PROMPT_WITH_CAPTION.format(caption=caption.strip())
+            if caption and caption.strip()
+            else VIDEO_PROMPT
+        )
+        prompt = [prompt_text, BinaryContent(data=video_bytes, media_type="video/mp4")]
+        return await self._run(user, prompt, EntrySource.VIDEO)
+
     def reset(self, telegram_user_id: int) -> None:
         self._history.clear(telegram_user_id)
 
@@ -141,8 +164,8 @@ class AgentRunner:
                     logger.exception("Fallback generation failed")
                     raise AgentError("The model is currently overloaded; try again in a moment.") from exc
 
-            # Photo bytes are dropped from history: keeping them re-uploads the
-            # image on every subsequent turn and burns tokens for nothing.
+            # Binary media is dropped from history: keeping it re-uploads the
+            # file on every subsequent turn and burns tokens for nothing.
             self._history.extend(user.telegram_user_id, _strip_binary(result.new_messages()))
 
         logger.info(
@@ -161,7 +184,7 @@ def _strip_binary(messages):
             content = getattr(part, "content", None)
             if isinstance(content, list):
                 part.content = [
-                    "[photo omitted from history]" if isinstance(item, BinaryContent) else item
+                    "[media omitted from history]" if isinstance(item, BinaryContent) else item
                     for item in content
                 ]
     return messages

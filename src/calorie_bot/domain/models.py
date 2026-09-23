@@ -30,6 +30,7 @@ class MealType(str, Enum):
 class EntrySource(str, Enum):
     TEXT = "text"
     PHOTO = "photo"
+    VIDEO = "video"
     RECIPE = "recipe"
     MANUAL = "manual"
 

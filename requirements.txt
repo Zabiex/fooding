@@ -19,3 +19,4 @@ requests
 python-dotenv
 httpx
 openai
+yt-dlp

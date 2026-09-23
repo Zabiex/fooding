@@ -50,6 +50,7 @@ class Settings(BaseSettings):
 
     default_timezone: str = Field("UTC", alias="DEFAULT_TIMEZONE")
     max_photo_bytes: int = Field(8 * 1024 * 1024, alias="MAX_PHOTO_BYTES")
+    max_video_bytes: int = Field(50 * 1024 * 1024, alias="MAX_VIDEO_BYTES")
     history_turns_kept: int = Field(12, alias="HISTORY_TURNS_KEPT")
     history_ttl_seconds: int = Field(30 * 60, alias="HISTORY_TTL_SECONDS")
     agent_timeout_seconds: float = Field(90.0, alias="AGENT_TIMEOUT_SECONDS")
