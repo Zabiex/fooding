@@ -12,7 +12,6 @@ content, so every database write is scoped to the sender by construction.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 import tempfile
@@ -247,13 +246,12 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if instagram_match:
         try:
             with tempfile.TemporaryDirectory(prefix="calorie-bot-") as directory:
-                video_path = await asyncio.to_thread(
-                    download_instagram_video,
+                video_path = await download_instagram_video(
                     instagram_match.group(0).rstrip(".,!?"),
                     str(Path(directory) / "video.mp4"),
                     max_bytes=services.runner.max_video_bytes,
                 )
-                video_bytes = await asyncio.to_thread(Path(video_path).read_bytes)
+                video_bytes = Path(video_path).read_bytes()
                 reply = await services.runner.run_video(
                     user, video_bytes, caption=message.text
                 )
