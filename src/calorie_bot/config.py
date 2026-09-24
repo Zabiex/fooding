@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(None, alias="OPENROUTER_API_KEY")
     # Use the provider-prefixed model name supported by the selected provider.
     model_name: str = Field("google:gemini-3.5-flash", alias="MODEL_NAME")
+    max_output_tokens: int = Field(4096, alias="MAX_OUTPUT_TOKENS")
 
     # --- Database ------------------------------------------------------------
     # Prefer the full connection URI in `DATABASE_URL`. Alternatively you can

@@ -60,7 +60,10 @@ def build_agent(settings: Settings) -> NutritionAgent:
         instructions=SYSTEM_INSTRUCTIONS,
         tools=ALL_TOOLS,
         retries=2,
-        model_settings=ModelSettings(temperature=0.2, max_tokens=1024),
+        model_settings=ModelSettings(
+            temperature=0.2,
+            max_tokens=settings.max_output_tokens,
+        ),
     )
 
     @agent.instructions
