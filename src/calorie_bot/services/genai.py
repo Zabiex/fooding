@@ -1,7 +1,7 @@
 """GenAI helpers: retry with exponential backoff and model fallbacks.
 
-Reads primary model from settings (`GEMINI_MODEL`) and optional
-fallback list from the environment variable `GEMINI_FALLBACK_MODELS`
+Reads primary model from settings (`MODEL_NAME`) and optional
+fallback list from the environment variable `MODEL_FALLBACKS`
 (comma-separated). Uses `tenacity` to retry transient `APIError`s.
 
 Usage:
@@ -58,7 +58,7 @@ def _get_genai_client():
 
 
 def _parse_fallback_models() -> List[str]:
-    raw = os.getenv("GEMINI_FALLBACK_MODELS", "")
+    raw = os.getenv("MODEL_FALLBACKS", "")
     parts = [p.strip() for p in raw.split(",") if p.strip()]
     return parts
 
@@ -146,10 +146,10 @@ def _call_openrouter(model_url: str, prompt: str):
 def generate_with_fallback(prompt: str) -> str:
     """Generate text using the primary model and fallbacks on transient 503s.
 
-    Primary model comes from settings.gemini_model. Optional environment
-    variable `GEMINI_FALLBACK_MODELS` can provide comma-separated fallbacks.
+    Primary model comes from settings.model_name. Optional environment
+    variable `MODEL_FALLBACKS` can provide comma-separated fallbacks.
     """
-    primary = settings.gemini_model
+    primary = settings.model_name
     fallbacks = _parse_fallback_models()
 
     # Build ordered unique list: primary then fallbacks

@@ -40,15 +40,16 @@ def build_model(settings: Settings) -> GoogleModel:
         openrouter_key = None
 
     if openrouter_key:
-        model_id = settings.gemini_model
-        # Ensure the inner token has an upstream provider (e.g. 'google/..').
+        model_id = settings.model_name
+        # Bare model names in this app target z-ai on OpenRouter. Explicit
+        # provider/model values remain unchanged.
         if '/' not in model_id:
-            model_id = f"google/{model_id}"
+            model_id = f"z-ai/{model_id}"
         # pydantic-ai expects a provider prefix separated by ':' so use 'openrouter:provider/model'
         return f"openrouter:{model_id}"
 
     provider = GoogleProvider(api_key=settings.google_api_key.get_secret_value())
-    return GoogleModel(settings.gemini_model, provider=provider)
+    return GoogleModel(settings.model_name, provider=provider)
 
 
 def build_agent(settings: Settings) -> NutritionAgent:
@@ -77,5 +78,5 @@ def build_agent(settings: Settings) -> NutritionAgent:
             protein_target=user.protein_target_g,
         )
 
-    logger.info("Nutrition agent built on model %s.", settings.gemini_model)
+    logger.info("Nutrition agent built on model %s.", settings.model_name)
     return agent

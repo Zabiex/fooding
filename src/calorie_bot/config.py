@@ -18,14 +18,13 @@ class Settings(BaseSettings):
     # --- Telegram ------------------------------------------------------------
     telegram_bot_token: SecretStr = Field(..., alias="TELEGRAM_BOT_TOKEN")
 
-    # --- Google / Gemini -----------------------------------------------------
+    # --- Model providers -----------------------------------------------------
     google_api_key: SecretStr = Field(..., alias="GOOGLE_API_KEY")
     apify_api_token: SecretStr | None = Field(None, alias="APIFY_API_TOKEN")
     # OpenRouter API key (optional) — when set the app will prefer OpenRouter
     openrouter_api_key: SecretStr | None = Field(None, alias="OPENROUTER_API_KEY")
-    # Use the provider-prefixed model name supported by the API client.
-    # The previous default 'gemini-1.5-flash' may not be available for v1beta.
-    gemini_model: str = Field("google:gemini-3.5-flash", alias="GEMINI_MODEL")
+    # Use the provider-prefixed model name supported by the selected provider.
+    model_name: str = Field("google:gemini-3.5-flash", alias="MODEL_NAME")
 
     # --- Database ------------------------------------------------------------
     # Prefer the full connection URI in `DATABASE_URL`. Alternatively you can
