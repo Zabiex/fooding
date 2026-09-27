@@ -91,6 +91,7 @@ PHOTO_PROMPT_WITH_CAPTION = (
 VIDEO_PROMPT = (
     "This is a recipe video from Instagram. Watch the full video, identify the "
     "ingredients and estimated weights in grams, calculate the total calories, "
+    "give detailed preparation instructions for the recipe, "
     "and log the resulting dish or meal."
 )
 
