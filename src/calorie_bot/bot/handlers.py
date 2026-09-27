@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
 
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
@@ -34,7 +32,7 @@ from ..agent.runner import AgentError, AgentRunner
 from ..db.repositories import Repositories
 from ..domain.models import UserProfile, UserTargetsUpdate, UserUpsert
 from ..services.nutrition import build_daily_summary
-from ..services.instagram import download_instagram_video
+from ..services.instagram import resolve_instagram_video_url
 from ..services.timeframes import is_valid_timezone, parse_day_offset
 from . import formatting
 
@@ -246,17 +244,13 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if instagram_match:
         source_url = instagram_match.group(0).rstrip(".,!?")
         try:
-            with tempfile.TemporaryDirectory(prefix="calorie-bot-") as directory:
-                video_path = await download_instagram_video(
-                    source_url,
-                    str(Path(directory) / "video.mp4"),
-                    max_bytes=services.runner.max_video_bytes,
-                    api_token=services.runner.apify_api_token,
-                )
-                video_bytes = Path(video_path).read_bytes()
-                reply = await services.runner.run_video(
-                    user, video_bytes, caption=message.text, source_url=source_url
-                )
+            video_url = await resolve_instagram_video_url(
+                source_url,
+                api_token=services.runner.apify_api_token,
+            )
+            reply = await services.runner.run_video(
+                user, video_url, caption=message.text, source_url=source_url
+            )
         except AgentError as exc:
             await _reply(update, formatting.e(str(exc)))
             return

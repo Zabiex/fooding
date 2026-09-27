@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -12,14 +11,12 @@ APIFY_RUN_URL = "https://api.apify.com/v2/actors/apify~instagram-scraper/runs"
 APIFY_DATASET_URL = "https://api.apify.com/v2/datasets/{dataset_id}/items"
 
 
-async def download_instagram_video(
+async def resolve_instagram_video_url(
     url: str,
-    output_path: str,
     *,
-    max_bytes: int,
     api_token: str | None = None,
 ) -> str:
-    """Scrape one public Instagram URL and stream its video to disk."""
+    """Scrape one public Instagram URL and return its direct video URL."""
     if not api_token:
         raise RuntimeError("APIFY_API_TOKEN is not configured")
 
@@ -55,25 +52,7 @@ async def download_instagram_video(
         stream_url = _find_video_url(items)
         if not stream_url:
             raise RuntimeError("Apify did not find a video at that Instagram URL")
-
-        async with client.stream("GET", stream_url) as video_response:
-            video_response.raise_for_status()
-            content_length = video_response.headers.get("content-length")
-            if content_length and int(content_length) > max_bytes:
-                raise RuntimeError("The Instagram video is too large to process")
-
-            path = Path(output_path)
-            written = 0
-            with path.open("wb") as output:
-                async for chunk in video_response.aiter_bytes():
-                    written += len(chunk)
-                    if written > max_bytes:
-                        raise RuntimeError("The Instagram video is too large to process")
-                    output.write(chunk)
-
-    if not path.is_file():
-        raise RuntimeError("Instagram did not provide a video file")
-    return str(path)
+        return stream_url
 
 
 def _find_video_url(value: Any) -> str | None:

@@ -1,6 +1,6 @@
 """Orchestration between the transport (Telegram) and the agent.
 
-The handler layer only ever calls `run_text` / `run_photo`. Everything about
+The handler layer calls `run_text`, `run_photo`, or `run_video`. Everything about
 dependency assembly, conversation history, per-user serialisation and timeouts
 lives here, so a second transport (web, CLI, WhatsApp) would reuse it verbatim.
 """
@@ -12,8 +12,9 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pydantic_ai import BinaryContent, UnexpectedModelBehavior
+from pydantic_ai import BinaryContent, UnexpectedModelBehavior, VideoUrl
 from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.settings import ModelSettings
 
 try:
     from google.genai.errors import ClientError as GoogleClientError
@@ -71,10 +72,6 @@ class AgentRunner:
         self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     @property
-    def max_video_bytes(self) -> int:
-        return self._settings.max_video_bytes
-
-    @property
     def apify_api_token(self) -> str | None:
         key = self._settings.apify_api_token
         return key.get_secret_value() if key else None
@@ -105,20 +102,17 @@ class AgentRunner:
     async def run_video(
         self,
         user: UserProfile,
-        video_bytes: bytes,
+        video_url: str,
         *,
         caption: str | None = None,
         source_url: str | None = None,
     ) -> AgentReply:
-        if len(video_bytes) > self._settings.max_video_bytes:
-            raise AgentError("That video is too large for me to process. Try a shorter video.")
-
         prompt_text = (
             VIDEO_PROMPT_WITH_CAPTION.format(caption=caption.strip())
             if caption and caption.strip()
             else VIDEO_PROMPT
         )
-        prompt = [prompt_text, BinaryContent(data=video_bytes, media_type="video/mp4")]
+        prompt = [prompt_text, VideoUrl(url=video_url)]
         return await self._run(
             user, prompt, EntrySource.VIDEO, source_url=source_url
         )
@@ -149,9 +143,19 @@ class AgentRunner:
                 if source is EntrySource.VIDEO
                 else self._settings.agent_timeout_seconds
             )
+            model_settings = (
+                ModelSettings(max_tokens=self._settings.video_max_output_tokens)
+                if source is EntrySource.VIDEO
+                else None
+            )
             try:
                 result = await asyncio.wait_for(
-                    self._agent.run(prompt, deps=deps, message_history=history),
+                    self._agent.run(
+                        prompt,
+                        deps=deps,
+                        message_history=history,
+                        model_settings=model_settings,
+                    ),
                     timeout=timeout_seconds,
                 )
             except asyncio.TimeoutError as exc:
@@ -223,7 +227,9 @@ def _strip_binary(messages):
             content = getattr(part, "content", None)
             if isinstance(content, list):
                 part.content = [
-                    "[media omitted from history]" if isinstance(item, BinaryContent) else item
+                    "[media omitted from history]"
+                    if isinstance(item, (BinaryContent, VideoUrl))
+                    else item
                     for item in content
                 ]
     return messages

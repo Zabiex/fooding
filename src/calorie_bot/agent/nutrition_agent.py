@@ -42,7 +42,8 @@ def build_model(settings: Settings) -> GoogleModel:
     if openrouter_key:
         model_id = settings.model_name
         # Bare model names in this app target z-ai on OpenRouter. Explicit
-        # provider/model values remain unchanged.
+        # provider/model values remain unchanged; multimodal models must use
+        # their exact provider-qualified OpenRouter ID.
         if '/' not in model_id:
             model_id = f"z-ai/{model_id}"
         # pydantic-ai expects a provider prefix separated by ':' so use 'openrouter:provider/model'
