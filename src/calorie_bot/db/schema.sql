@@ -94,6 +94,7 @@ begin
         user_id             uuid        not null references public.users (id) on delete cascade,
         name                text        not null check (length(btrim(name)) > 0),
         description         text,
+        preparation_instructions text,
         servings            double precision not null default 1 check (servings > 0),
         ingredients         jsonb       not null default '[]'::jsonb,
         calories            double precision not null check (calories >= 0),   -- per serving
@@ -106,6 +107,9 @@ begin
         created_at          timestamptz not null default now(),
         updated_at          timestamptz not null default now()
     );
+
+    alter table public.recipes
+        add column if not exists preparation_instructions text;
 
     -- One recipe name per user (case-insensitive). Different users may reuse names.
     create unique index if not exists recipes_user_name_uniq

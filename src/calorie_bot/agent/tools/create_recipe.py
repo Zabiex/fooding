@@ -23,6 +23,7 @@ async def create_recipe(
     fat_g_per_serving: float = 0.0,
     fiber_g_per_serving: float = 0.0,
     description: str | None = None,
+    preparation_instructions: str | None = None,
     ingredients: list[Ingredient] | None = None,
     tags: list[str] | None = None,
     overwrite_existing: bool = True,
@@ -40,7 +41,8 @@ async def create_recipe(
         carbs_g_per_serving: Grams of carbohydrate in one serving.
         fat_g_per_serving: Grams of fat in one serving.
         fiber_g_per_serving: Grams of fiber in one serving.
-        description: Preparation steps and useful notes to return when the user asks how to make this recipe.
+        description: Optional notes about the recipe.
+        preparation_instructions: Ordered steps explaining how to prepare the recipe.
         ingredients: Optional ingredient list with quantities and units.
         tags: Optional labels such as "vegetarian", "meal-prep".
         overwrite_existing: Replace a recipe of the same name if one exists.
@@ -57,6 +59,7 @@ async def create_recipe(
     draft = RecipeDraft(
         name=name,
         description=description,
+        preparation_instructions=preparation_instructions,
         servings=servings,
         ingredients=ingredients or [],
         nutrition_per_serving=per_serving,

@@ -71,6 +71,7 @@ def _recipe_from_row(row: Row) -> Recipe:
         user_id=row["user_id"],
         name=row["name"],
         description=row["description"],
+        preparation_instructions=row["preparation_instructions"],
         servings=row["servings"],
         ingredients=[Ingredient.model_validate(item) for item in raw_ingredients],
         nutrition_per_serving=_nutrition_from_row(row),
@@ -98,7 +99,7 @@ def _log_entry_from_row(row: Row) -> LogEntry:
 
 
 _RECIPE_COLUMNS = """
-    id, user_id, name, description, servings, ingredients,
+    id, user_id, name, description, preparation_instructions, servings, ingredients,
     calories, protein_g, carbs_g, fat_g, fiber_g,
     tags, is_archived, created_at, updated_at
 """
@@ -231,9 +232,10 @@ class RecipeRepository:
                     row = await connection.fetchrow(
                         f"""
                         update public.recipes
-                           set name = $3, description = $4, servings = $5, ingredients = $6,
-                               calories = $7, protein_g = $8, carbs_g = $9, fat_g = $10, fiber_g = $11,
-                               tags = $12, is_archived = false
+                           set name = $3, description = $4, preparation_instructions = $5,
+                               servings = $6, ingredients = $7,
+                               calories = $8, protein_g = $9, carbs_g = $10, fat_g = $11, fiber_g = $12,
+                               tags = $13, is_archived = false
                          where id = $1 and user_id = $2
                         returning {_RECIPE_COLUMNS}
                         """,
@@ -241,6 +243,7 @@ class RecipeRepository:
                         user_id,
                         draft.name,
                         draft.description,
+                        draft.preparation_instructions,
                         draft.servings,
                         ingredients,
                         nutrition.calories,
@@ -256,14 +259,15 @@ class RecipeRepository:
                 row = await connection.fetchrow(
                     f"""
                     insert into public.recipes
-                        (user_id, name, description, servings, ingredients,
+                        (user_id, name, description, preparation_instructions, servings, ingredients,
                          calories, protein_g, carbs_g, fat_g, fiber_g, tags)
-                    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                     returning {_RECIPE_COLUMNS}
                     """,
                     user_id,
                     draft.name,
                     draft.description,
+                    draft.preparation_instructions,
                     draft.servings,
                     ingredients,
                     nutrition.calories,

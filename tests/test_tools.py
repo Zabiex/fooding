@@ -155,7 +155,7 @@ async def test_describe_recipe_returns_saved_ingredients_and_instructions():
         ctx,
         name="Tomato pasta",
         calories_per_serving=400,
-        description="Boil pasta, then toss with simmered tomato sauce.",
+        preparation_instructions="Boil pasta, then toss with simmered tomato sauce.",
         ingredients=[{"name": "pasta", "quantity": 100, "unit": "g"}],
     )
 
@@ -163,6 +163,8 @@ async def test_describe_recipe_returns_saved_ingredients_and_instructions():
     assert len(details) == 1
     assert details[0].ingredients[0].name == "pasta"
     assert details[0].preparation_instructions.startswith("Boil pasta")
+    saved_recipe = next(iter(ctx.deps.repos.recipes.rows.values()))
+    assert saved_recipe.preparation_instructions.startswith("Boil pasta")
 
 
 @pytest.mark.asyncio

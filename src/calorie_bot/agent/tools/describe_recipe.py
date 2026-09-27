@@ -32,8 +32,8 @@ async def describe_recipe(
             servings=recipe.servings,
             ingredients=recipe.ingredients,
             preparation_instructions=(
-                recipe.description.strip()
-                if recipe.description and recipe.description.strip()
+                recipe.preparation_instructions.strip()
+                if recipe.preparation_instructions and recipe.preparation_instructions.strip()
                 else "No preparation instructions have been saved for this recipe."
             ),
         )
