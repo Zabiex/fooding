@@ -100,9 +100,26 @@ def _log_entry_from_row(row: Row) -> LogEntry:
 
 
 _RECIPE_COLUMNS = """
-    id, user_id, name, description, preparation_instructions, source_url, servings, ingredients,
-    calories, protein_g, carbs_g, fat_g, fiber_g,
-    tags, is_archived, created_at, updated_at
+    recipes.id, recipes.user_id, recipes.name, recipes.description,
+    recipes.preparation_instructions, recipes.source_url, recipes.servings,
+    (
+        select coalesce(
+            jsonb_agg(
+                jsonb_build_object(
+                    'name', i.name,
+                    'quantity', ri.quantity,
+                    'unit', ri.unit,
+                    'note', ri.note
+                ) order by ri.position, ri.id
+            ),
+            '[]'::jsonb
+        )
+          from public.recipe_ingredients ri
+          join public.ingredients i on i.id = ri.ingredient_id
+         where ri.recipe_id = recipes.id
+    ) as ingredients,
+    recipes.calories, recipes.protein_g, recipes.carbs_g, recipes.fat_g, recipes.fiber_g,
+    recipes.tags, recipes.is_archived, recipes.created_at, recipes.updated_at
 """
 
 _LOG_COLUMNS = """
@@ -205,7 +222,6 @@ class RecipeRepository:
 
         Returns `(recipe, was_updated)`.
         """
-        ingredients = [item.model_dump(exclude_none=True) for item in draft.ingredients]
         nutrition = draft.nutrition_per_serving
 
         async with self._pool.acquire() as connection:
@@ -230,15 +246,15 @@ class RecipeRepository:
                     return _recipe_from_row(row), False
 
                 if existing:
-                    row = await connection.fetchrow(
+                    updated = await connection.fetchrow(
                         f"""
                         update public.recipes
                            set name = $3, description = $4, preparation_instructions = $5,
-                               source_url = $6, servings = $7, ingredients = $8,
-                               calories = $9, protein_g = $10, carbs_g = $11, fat_g = $12, fiber_g = $13,
-                               tags = $14, is_archived = false
+                               source_url = $6, servings = $7,
+                               calories = $8, protein_g = $9, carbs_g = $10, fat_g = $11, fiber_g = $12,
+                               tags = $13, is_archived = false
                          where id = $1 and user_id = $2
-                        returning {_RECIPE_COLUMNS}
+                        returning id
                         """,
                         existing["id"],
                         user_id,
@@ -247,13 +263,21 @@ class RecipeRepository:
                         draft.preparation_instructions,
                         draft.source_url,
                         draft.servings,
-                        ingredients,
                         nutrition.calories,
                         nutrition.protein_g,
                         nutrition.carbs_g,
                         nutrition.fat_g,
                         nutrition.fiber_g,
                         draft.tags,
+                    )
+                    assert updated is not None
+                    recipe_id = updated["id"]
+                    await self._replace_ingredients(
+                        connection, recipe_id, draft.ingredients
+                    )
+                    row = await connection.fetchrow(
+                        f"select {_RECIPE_COLUMNS} from public.recipes where id = $1",
+                        recipe_id,
                     )
                     assert row is not None
                     return _recipe_from_row(row), True
@@ -262,9 +286,9 @@ class RecipeRepository:
                     f"""
                     insert into public.recipes
                         (user_id, name, description, preparation_instructions, source_url,
-                        servings, ingredients, calories, protein_g, carbs_g, fat_g, fiber_g, tags)
-                    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                    returning {_RECIPE_COLUMNS}
+                         servings, calories, protein_g, carbs_g, fat_g, fiber_g, tags)
+                    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    returning id
                     """,
                     user_id,
                     draft.name,
@@ -272,7 +296,6 @@ class RecipeRepository:
                     draft.preparation_instructions,
                     draft.source_url,
                     draft.servings,
-                    ingredients,
                     nutrition.calories,
                     nutrition.protein_g,
                     nutrition.carbs_g,
@@ -281,7 +304,51 @@ class RecipeRepository:
                     draft.tags,
                 )
                 assert row is not None
-                return _recipe_from_row(row), False
+                recipe_id = row["id"]
+                await self._replace_ingredients(
+                    connection, recipe_id, draft.ingredients
+                )
+                saved = await connection.fetchrow(
+                    f"select {_RECIPE_COLUMNS} from public.recipes where id = $1",
+                    recipe_id,
+                )
+                assert saved is not None
+                return _recipe_from_row(saved), False
+
+    async def _replace_ingredients(
+        self,
+        connection: asyncpg.Connection,
+        recipe_id: UUID,
+        ingredients: list[Ingredient],
+    ) -> None:
+        await connection.execute(
+            "delete from public.recipe_ingredients where recipe_id = $1",
+            recipe_id,
+        )
+        for position, ingredient in enumerate(ingredients):
+            ingredient_id = await connection.fetchval(
+                """
+                insert into public.ingredients as existing_ingredient (name)
+                values ($1)
+                on conflict (normalized_name)
+                do update set name = existing_ingredient.name
+                returning id
+                """,
+                ingredient.name.strip(),
+            )
+            await connection.execute(
+                """
+                insert into public.recipe_ingredients
+                    (recipe_id, ingredient_id, quantity, unit, note, position)
+                values ($1, $2, $3, $4, $5, $6)
+                """,
+                recipe_id,
+                ingredient_id,
+                ingredient.quantity,
+                ingredient.unit,
+                ingredient.note,
+                position,
+            )
 
     async def get(self, recipe_id: UUID) -> Recipe | None:
         row = await self._pool.fetchrow(

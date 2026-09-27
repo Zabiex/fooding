@@ -86,8 +86,8 @@ begin
     ---------------------------------------------------------------------------
     -- recipes
     --
-    -- Nutrition is stored per serving; ingredients are a jsonb array so the
-    -- agent can round-trip structured ingredient data without a join table.
+    -- Nutrition is stored per serving. Ingredient identity is normalized and
+    -- recipe-specific amounts live on the recipe_ingredients relationship.
     ---------------------------------------------------------------------------
     create table if not exists public.recipes (
         id                  uuid primary key default gen_random_uuid(),
@@ -97,7 +97,6 @@ begin
         preparation_instructions text,
         source_url          text,
         servings            double precision not null default 1 check (servings > 0),
-        ingredients         jsonb       not null default '[]'::jsonb,
         calories            double precision not null check (calories >= 0),   -- per serving
         protein_g           double precision not null default 0 check (protein_g >= 0),
         carbs_g             double precision not null default 0 check (carbs_g   >= 0),
@@ -114,6 +113,67 @@ begin
 
     alter table public.recipes
         add column if not exists source_url text;
+
+    create table if not exists public.ingredients (
+        id              uuid primary key default gen_random_uuid(),
+        name            text not null check (length(btrim(name)) > 0),
+        normalized_name text generated always as (lower(btrim(name))) stored unique,
+        created_at      timestamptz not null default now()
+    );
+
+    create table if not exists public.recipe_ingredients (
+        id            uuid primary key default gen_random_uuid(),
+        recipe_id     uuid not null references public.recipes (id) on delete cascade,
+        ingredient_id uuid not null references public.ingredients (id) on delete restrict,
+        quantity      double precision check (quantity is null or quantity >= 0),
+        unit          text,
+        note          text,
+        position      integer not null default 0 check (position >= 0)
+    );
+
+    alter table public.recipe_ingredients
+        drop column if exists measurement_system;
+
+    create index if not exists recipe_ingredients_recipe_position_idx
+        on public.recipe_ingredients (recipe_id, position);
+
+    create index if not exists recipe_ingredients_ingredient_id_idx
+        on public.recipe_ingredients (ingredient_id);
+
+    -- Migrate installations that still have the old JSONB recipe ingredient column.
+    if exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'recipes'
+           and column_name = 'ingredients'
+    ) then
+        execute $migration$
+            insert into public.ingredients (name)
+            select distinct btrim(item->>'name')
+              from public.recipes r
+              cross join lateral jsonb_array_elements(coalesce(r.ingredients, '[]'::jsonb)) item
+             where nullif(btrim(item->>'name'), '') is not null
+            on conflict (normalized_name) do nothing
+        $migration$;
+
+        execute $migration$
+            insert into public.recipe_ingredients
+                (recipe_id, ingredient_id, quantity, unit, note, position)
+            select r.id,
+                   i.id,
+                   nullif(item->>'quantity', '')::double precision,
+                   nullif(item->>'unit', ''),
+                   nullif(item->>'note', ''),
+                   (entry.ordinality - 1)::integer
+              from public.recipes r
+              cross join lateral jsonb_array_elements(coalesce(r.ingredients, '[]'::jsonb))
+                   with ordinality as entry(item, ordinality)
+              join public.ingredients i
+                on i.normalized_name = lower(btrim(entry.item->>'name'))
+        $migration$;
+
+        alter table public.recipes drop column ingredients;
+    end if;
 
     -- One recipe name per user (case-insensitive). Different users may reuse names.
     create unique index if not exists recipes_user_name_uniq

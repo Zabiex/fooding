@@ -45,7 +45,7 @@ async def create_recipe(
         description: Optional notes about the recipe.
         preparation_instructions: Ordered steps explaining how to prepare the recipe.
         source_url: URL where the recipe came from, if the user provided one.
-        ingredients: Optional ingredient list with quantities and units.
+        ingredients: Optional ingredient list with quantities, units, and measurement systems.
         tags: Optional labels such as "vegetarian", "meal-prep".
         overwrite_existing: Replace a recipe of the same name if one exists.
     """

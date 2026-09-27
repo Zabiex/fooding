@@ -91,7 +91,7 @@ class Nutrition(BaseModel):
 
 
 class Ingredient(BaseModel):
-    """One line of a recipe. Quantities are optional — free text is allowed."""
+    """One recipe ingredient with its quantity and unit."""
 
     name: str = Field(..., min_length=1, description="Ingredient name, e.g. 'rolled oats'.")
     quantity: float | None = Field(None, ge=0, description="Numeric amount, e.g. 80.")

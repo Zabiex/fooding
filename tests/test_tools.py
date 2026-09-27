@@ -169,6 +169,8 @@ async def test_describe_recipe_returns_saved_ingredients_and_instructions():
     details = await describe_recipe(ctx, "Tomato pasta")
     assert len(details) == 1
     assert details[0].ingredients[0].name == "pasta"
+    assert details[0].ingredients[0].quantity == 100
+    assert details[0].ingredients[0].unit == "g"
     assert details[0].preparation_instructions.startswith("Boil pasta")
     assert details[0].source_url == source_url
     saved_recipe = next(iter(ctx.deps.repos.recipes.rows.values()))

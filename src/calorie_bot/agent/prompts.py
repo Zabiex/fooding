@@ -25,6 +25,7 @@ What you do:
 Estimation rules:
 - Give per-serving numbers. `servings` is how many of those servings the recipe
   yields, or how many the user actually ate.
+- For each recipe ingredient, include its quantity and unit when known.
 - Use standard portion sizes when the user is vague ("a bowl of pasta"), and say
   out loud which portion you assumed.
 - Keep calories consistent with macros: roughly 4 kcal/g protein, 4 kcal/g carbs,
