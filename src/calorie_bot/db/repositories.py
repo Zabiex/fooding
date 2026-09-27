@@ -106,7 +106,7 @@ _RECIPE_COLUMNS = """
         select coalesce(
             jsonb_agg(
                 jsonb_build_object(
-                    'name', i.name,
+                    'name', coalesce(ri.display_name, i.name),
                     'quantity', ri.quantity,
                     'unit', ri.unit,
                     'note', ri.note
@@ -326,24 +326,46 @@ class RecipeRepository:
             recipe_id,
         )
         for position, ingredient in enumerate(ingredients):
+            display_name = ingredient.name.strip()
+            normalized_alias = display_name.lower()
             ingredient_id = await connection.fetchval(
-                """
-                insert into public.ingredients as existing_ingredient (name)
-                values ($1)
-                on conflict (normalized_name)
-                do update set name = existing_ingredient.name
-                returning id
-                """,
-                ingredient.name.strip(),
+                "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
+                normalized_alias,
             )
+            if ingredient_id is None:
+                ingredient_id = await connection.fetchval(
+                    """
+                    insert into public.ingredients (name)
+                    values ($1)
+                    on conflict (normalized_name) do update set name = excluded.name
+                    returning id
+                    """,
+                    display_name,
+                )
+                await connection.execute(
+                    """
+                    insert into public.ingredient_aliases
+                        (alias, normalized_alias, ingredient_id)
+                    values ($1, $2, $3)
+                    on conflict (normalized_alias) do nothing
+                    """,
+                    display_name,
+                    normalized_alias,
+                    ingredient_id,
+                )
+                ingredient_id = await connection.fetchval(
+                    "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
+                    normalized_alias,
+                )
             await connection.execute(
                 """
                 insert into public.recipe_ingredients
-                    (recipe_id, ingredient_id, quantity, unit, note, position)
-                values ($1, $2, $3, $4, $5, $6)
+                    (recipe_id, ingredient_id, display_name, quantity, unit, note, position)
+                values ($1, $2, $3, $4, $5, $6, $7)
                 """,
                 recipe_id,
                 ingredient_id,
+                display_name,
                 ingredient.quantity,
                 ingredient.unit,
                 ingredient.note,

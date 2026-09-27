@@ -121,10 +121,19 @@ begin
         created_at      timestamptz not null default now()
     );
 
+    create table if not exists public.ingredient_aliases (
+        id                uuid primary key default gen_random_uuid(),
+        alias             text not null check (length(btrim(alias)) > 0),
+        normalized_alias  text not null unique,
+        ingredient_id     uuid not null references public.ingredients (id) on delete cascade,
+        created_at        timestamptz not null default now()
+    );
+
     create table if not exists public.recipe_ingredients (
         id            uuid primary key default gen_random_uuid(),
         recipe_id     uuid not null references public.recipes (id) on delete cascade,
         ingredient_id uuid not null references public.ingredients (id) on delete restrict,
+        display_name  text,
         quantity      double precision check (quantity is null or quantity >= 0),
         unit          text,
         note          text,
@@ -133,6 +142,47 @@ begin
 
     alter table public.recipe_ingredients
         drop column if exists measurement_system;
+
+    alter table public.recipe_ingredients
+        add column if not exists display_name text;
+
+    insert into public.ingredients (name)
+    values ('egg')
+    on conflict (normalized_name) do nothing;
+
+    insert into public.ingredient_aliases (alias, normalized_alias, ingredient_id)
+    select aliases.alias,
+           lower(btrim(aliases.alias)),
+           ingredients.id
+      from public.ingredients
+      cross join (values ('egg'), ('eggs'), ('large egg'), ('large eggs')) as aliases(alias)
+     where ingredients.normalized_name = 'egg'
+    on conflict (normalized_alias) do update
+        set ingredient_id = excluded.ingredient_id;
+
+    -- Every existing catalog name is at least its own alias. Curated aliases above win.
+    insert into public.ingredient_aliases (alias, normalized_alias, ingredient_id)
+    select i.name, i.normalized_name, i.id
+      from public.ingredients i
+    on conflict (normalized_alias) do nothing;
+
+    -- Preserve each recipe's original wording, then repoint known duplicate rows.
+    update public.recipe_ingredients ri
+       set display_name = coalesce(ri.display_name, source_ingredient.name),
+           ingredient_id = alias.ingredient_id
+      from public.ingredients source_ingredient
+      join public.ingredient_aliases alias
+        on alias.normalized_alias = source_ingredient.normalized_name
+     where ri.ingredient_id = source_ingredient.id
+       and (ri.display_name is null or ri.ingredient_id <> alias.ingredient_id);
+
+    delete from public.ingredients i
+     where not exists (
+               select 1 from public.recipe_ingredients ri where ri.ingredient_id = i.id
+           )
+       and not exists (
+               select 1 from public.ingredient_aliases a where a.ingredient_id = i.id
+           );
 
     create index if not exists recipe_ingredients_recipe_position_idx
         on public.recipe_ingredients (recipe_id, position);
@@ -148,19 +198,28 @@ begin
            and column_name = 'ingredients'
     ) then
         execute $migration$
-            insert into public.ingredients (name)
-            select distinct btrim(item->>'name')
+                        insert into public.ingredients (name)
+                        select distinct btrim(item->>'name')
               from public.recipes r
               cross join lateral jsonb_array_elements(coalesce(r.ingredients, '[]'::jsonb)) item
+                            left join public.ingredient_aliases a
+                                on a.normalized_alias = lower(btrim(item->>'name'))
              where nullif(btrim(item->>'name'), '') is not null
+                             and a.id is null
             on conflict (normalized_name) do nothing
         $migration$;
 
+                insert into public.ingredient_aliases (alias, normalized_alias, ingredient_id)
+                select i.name, i.normalized_name, i.id
+                    from public.ingredients i
+                on conflict (normalized_alias) do nothing;
+
         execute $migration$
             insert into public.recipe_ingredients
-                (recipe_id, ingredient_id, quantity, unit, note, position)
+                                (recipe_id, ingredient_id, display_name, quantity, unit, note, position)
             select r.id,
-                   i.id,
+                                     a.ingredient_id,
+                                     btrim(item->>'name'),
                    nullif(item->>'quantity', '')::double precision,
                    nullif(item->>'unit', ''),
                    nullif(item->>'note', ''),
@@ -168,8 +227,8 @@ begin
               from public.recipes r
               cross join lateral jsonb_array_elements(coalesce(r.ingredients, '[]'::jsonb))
                    with ordinality as entry(item, ordinality)
-              join public.ingredients i
-                on i.normalized_name = lower(btrim(entry.item->>'name'))
+                            join public.ingredient_aliases a
+                                on a.normalized_alias = lower(btrim(entry.item->>'name'))
         $migration$;
 
         alter table public.recipes drop column ingredients;
@@ -246,6 +305,9 @@ begin
     alter table public.users       enable row level security;
     alter table public.recipes     enable row level security;
     alter table public.log_entries enable row level security;
+    alter table public.ingredients enable row level security;
+    alter table public.ingredient_aliases enable row level security;
+    alter table public.recipe_ingredients enable row level security;
 end;
 $init$;
 
