@@ -144,15 +144,30 @@ class AgentRunner:
 
         async with self._locks[user.telegram_user_id]:
             history = self._history.get(user.telegram_user_id)
+            timeout_seconds = (
+                self._settings.video_agent_timeout_seconds
+                if source is EntrySource.VIDEO
+                else self._settings.agent_timeout_seconds
+            )
             try:
                 result = await asyncio.wait_for(
                     self._agent.run(prompt, deps=deps, message_history=history),
-                    timeout=self._settings.agent_timeout_seconds,
+                    timeout=timeout_seconds,
                 )
             except asyncio.TimeoutError as exc:
-                logger.warning("agent_timeout user=%s", user.telegram_user_id)
+                logger.warning(
+                    "agent_timeout user=%s source=%s timeout_seconds=%s",
+                    user.telegram_user_id,
+                    source.value,
+                    timeout_seconds,
+                )
+                message = (
+                    "That video took too long to analyze. Try a shorter clip."
+                    if source is EntrySource.VIDEO
+                    else "That took too long to work out. Could you try again, or describe it in fewer words?"
+                )
                 raise AgentError(
-                    "That took too long to work out. Could you try again, or describe it in fewer words?"
+                    message
                 ) from exc
             except UnexpectedModelBehavior as exc:
                 logger.exception("agent_model_error user=%s", user.telegram_user_id)

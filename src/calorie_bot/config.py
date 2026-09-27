@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     history_turns_kept: int = Field(12, alias="HISTORY_TURNS_KEPT")
     history_ttl_seconds: int = Field(30 * 60, alias="HISTORY_TTL_SECONDS")
     agent_timeout_seconds: float = Field(90.0, alias="AGENT_TIMEOUT_SECONDS")
+    video_agent_timeout_seconds: float = Field(300.0, alias="VIDEO_AGENT_TIMEOUT_SECONDS")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 
 
