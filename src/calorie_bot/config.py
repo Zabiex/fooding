@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(None, alias="OPENROUTER_API_KEY")
     # Use the provider-prefixed model name supported by the selected provider.
     model_name: str = Field("google:gemini-3.5-flash", alias="MODEL_NAME")
+    ingredient_resolver_model: str = Field(
+        "google/gemini-2.5-flash-lite", alias="INGREDIENT_RESOLVER_MODEL"
+    )
     max_output_tokens: int = Field(4096, alias="MAX_OUTPUT_TOKENS")
     video_max_output_tokens: int = Field(16384, alias="VIDEO_MAX_OUTPUT_TOKENS")
 

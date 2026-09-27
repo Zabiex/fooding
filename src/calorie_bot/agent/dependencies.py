@@ -13,6 +13,7 @@ from datetime import datetime
 
 from ..db.repositories import Repositories
 from ..domain.models import EntrySource, UserProfile
+from ..services.ingredient_resolver import IngredientResolver
 from ..services.timeframes import local_now
 
 
@@ -23,6 +24,7 @@ class AgentDeps:
     #: Where this turn came from, so logged entries are tagged text vs photo.
     input_source: EntrySource = EntrySource.TEXT
     source_url: str | None = None
+    ingredient_resolver: IngredientResolver | None = None
 
     @property
     def user_id(self):  # noqa: ANN201 - UUID, kept implicit for brevity

@@ -217,6 +217,7 @@ class RecipeRepository:
         draft: RecipeDraft,
         *,
         overwrite_existing: bool = True,
+        canonical_ingredient_ids: list[UUID | None] | None = None,
     ) -> tuple[Recipe, bool]:
         """Insert a recipe, or update the user's existing one with the same name.
 
@@ -273,7 +274,10 @@ class RecipeRepository:
                     assert updated is not None
                     recipe_id = updated["id"]
                     await self._replace_ingredients(
-                        connection, recipe_id, draft.ingredients
+                        connection,
+                        recipe_id,
+                        draft.ingredients,
+                        canonical_ingredient_ids,
                     )
                     row = await connection.fetchrow(
                         f"select {_RECIPE_COLUMNS} from public.recipes where id = $1",
@@ -306,7 +310,10 @@ class RecipeRepository:
                 assert row is not None
                 recipe_id = row["id"]
                 await self._replace_ingredients(
-                    connection, recipe_id, draft.ingredients
+                    connection,
+                    recipe_id,
+                    draft.ingredients,
+                    canonical_ingredient_ids,
                 )
                 saved = await connection.fetchrow(
                     f"select {_RECIPE_COLUMNS} from public.recipes where id = $1",
@@ -320,6 +327,7 @@ class RecipeRepository:
         connection: asyncpg.Connection,
         recipe_id: UUID,
         ingredients: list[Ingredient],
+        canonical_ingredient_ids: list[UUID | None] | None = None,
     ) -> None:
         await connection.execute(
             "delete from public.recipe_ingredients where recipe_id = $1",
@@ -328,35 +336,17 @@ class RecipeRepository:
         for position, ingredient in enumerate(ingredients):
             display_name = ingredient.name.strip()
             normalized_alias = display_name.lower()
-            ingredient_id = await connection.fetchval(
-                "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
-                normalized_alias,
+            suggested_id = (
+                canonical_ingredient_ids[position]
+                if canonical_ingredient_ids and position < len(canonical_ingredient_ids)
+                else None
             )
-            if ingredient_id is None:
-                ingredient_id = await connection.fetchval(
-                    """
-                    insert into public.ingredients (name)
-                    values ($1)
-                    on conflict (normalized_name) do update set name = excluded.name
-                    returning id
-                    """,
-                    display_name,
-                )
-                await connection.execute(
-                    """
-                    insert into public.ingredient_aliases
-                        (alias, normalized_alias, ingredient_id)
-                    values ($1, $2, $3)
-                    on conflict (normalized_alias) do nothing
-                    """,
-                    display_name,
-                    normalized_alias,
-                    ingredient_id,
-                )
-                ingredient_id = await connection.fetchval(
-                    "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
-                    normalized_alias,
-                )
+            ingredient_id = await self._resolve_ingredient_id(
+                connection,
+                display_name,
+                normalized_alias,
+                suggested_id,
+            )
             await connection.execute(
                 """
                 insert into public.recipe_ingredients
@@ -371,6 +361,97 @@ class RecipeRepository:
                 ingredient.note,
                 position,
             )
+
+    async def _resolve_ingredient_id(
+        self,
+        connection: asyncpg.Connection,
+        display_name: str,
+        normalized_alias: str,
+        suggested_id: UUID | None,
+    ) -> UUID:
+        ingredient_id = await connection.fetchval(
+            "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
+            normalized_alias,
+        )
+        if ingredient_id is not None:
+            return ingredient_id
+
+        if suggested_id is not None:
+            exists = await connection.fetchval(
+                "select id from public.ingredients where id = $1",
+                suggested_id,
+            )
+            if exists is not None:
+                await connection.execute(
+                    """
+                    insert into public.ingredient_aliases
+                        (alias, normalized_alias, ingredient_id)
+                    values ($1, $2, $3)
+                    on conflict (normalized_alias) do nothing
+                    """,
+                    display_name,
+                    normalized_alias,
+                    suggested_id,
+                )
+                resolved_id = await connection.fetchval(
+                    "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
+                    normalized_alias,
+                )
+                if resolved_id is not None:
+                    return resolved_id
+
+        ingredient_id = await connection.fetchval(
+            """
+            insert into public.ingredients (name)
+            values ($1)
+            on conflict (normalized_name) do update set name = excluded.name
+            returning id
+            """,
+            display_name,
+        )
+        await connection.execute(
+            """
+            insert into public.ingredient_aliases
+                (alias, normalized_alias, ingredient_id)
+            values ($1, $2, $3)
+            on conflict (normalized_alias) do nothing
+            """,
+            display_name,
+            normalized_alias,
+            ingredient_id,
+        )
+        resolved_id = await connection.fetchval(
+            "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
+            normalized_alias,
+        )
+        if resolved_id is None:
+            raise RuntimeError("Could not resolve ingredient alias after insert")
+        return resolved_id
+
+    async def find_ingredient_alias_id(self, name: str) -> UUID | None:
+        return await self._pool.fetchval(
+            "select ingredient_id from public.ingredient_aliases where normalized_alias = $1",
+            name.strip().lower(),
+        )
+
+    async def find_ingredient_candidates(
+        self, name: str, *, limit: int = 12
+    ) -> list[asyncpg.Record]:
+        normalized_name = name.strip().lower()
+        return await self._pool.fetch(
+            """
+            select id, name,
+                   greatest(
+                       similarity(normalized_name, $1),
+                       word_similarity($1, normalized_name)
+                   ) as score
+              from public.ingredients
+             order by score desc, normalized_name
+             limit $2
+            """,
+            normalized_name,
+            limit,
+        )
 
     async def get(self, recipe_id: UUID) -> Recipe | None:
         row = await self._pool.fetchrow(

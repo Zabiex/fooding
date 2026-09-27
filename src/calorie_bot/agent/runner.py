@@ -31,7 +31,8 @@ from ..db.repositories import Repositories
 from ..domain.models import EntrySource, UserProfile
 from .dependencies import AgentDeps
 from .history import ConversationStore
-from .nutrition_agent import NutritionAgent
+from .nutrition_agent import NutritionAgent, build_model
+from ..services.ingredient_resolver import IngredientResolver
 from .prompts import (
     PHOTO_PROMPT,
     PHOTO_PROMPT_WITH_CAPTION,
@@ -64,6 +65,12 @@ class AgentRunner:
         self._agent = agent
         self._repos = repos
         self._settings = settings
+        resolver_model_name = getattr(settings, "ingredient_resolver_model", None)
+        self._ingredient_resolver = (
+            IngredientResolver(build_model(settings, resolver_model_name))
+            if resolver_model_name
+            else None
+        )
         self._history = history or ConversationStore(
             max_turns=settings.history_turns_kept,
             ttl_seconds=settings.history_ttl_seconds,
@@ -134,6 +141,7 @@ class AgentRunner:
             repos=self._repos,
             input_source=source,
             source_url=source_url,
+            ingredient_resolver=self._ingredient_resolver,
         )
 
         async with self._locks[user.telegram_user_id]:

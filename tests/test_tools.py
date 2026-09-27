@@ -38,8 +38,17 @@ USER_B = UUID("22222222-2222-2222-2222-222222222222")
 class FakeRecipeRepo:
     def __init__(self) -> None:
         self.rows: dict[UUID, Recipe] = {}
+        self.canonical_ingredient_ids = None
 
-    async def save(self, user_id, draft: RecipeDraft, *, overwrite_existing=True):
+    async def save(
+        self,
+        user_id,
+        draft: RecipeDraft,
+        *,
+        overwrite_existing=True,
+        canonical_ingredient_ids=None,
+    ):
+        self.canonical_ingredient_ids = canonical_ingredient_ids
         existing = next(
             (r for r in self.rows.values() if r.user_id == user_id and r.name == draft.name),
             None,
@@ -105,6 +114,7 @@ def make_ctx(
     *,
     target: int | None = 2000,
     source_url: str | None = None,
+    ingredient_resolver=None,
 ) -> SimpleNamespace:
     user = UserProfile(
         id=user_id,
@@ -118,6 +128,7 @@ def make_ctx(
         repos=FakeRepos(FakeRecipeRepo(), FakeLogRepo()),  # type: ignore[arg-type]
         input_source=EntrySource.TEXT,
         source_url=source_url,
+        ingredient_resolver=ingredient_resolver,
     )
     return SimpleNamespace(deps=deps)
 
@@ -152,6 +163,25 @@ async def test_create_recipe_rejects_inconsistent_macros():
             calories_per_serving=100,   # 90 g of fat is ~810 kcal on its own
             fat_g_per_serving=90,
         )
+
+
+@pytest.mark.asyncio
+async def test_create_recipe_passes_resolved_ingredient_ids_to_repository():
+    canonical_id = uuid4()
+
+    class FakeIngredientResolver:
+        async def resolve(self, recipe_repository, ingredients):
+            assert len(ingredients) == 1
+            return [canonical_id]
+
+    ctx = make_ctx(ingredient_resolver=FakeIngredientResolver())
+    await create_recipe(
+        ctx,
+        name="Egg toast",
+        calories_per_serving=300,
+        ingredients=[{"name": "large eggs", "quantity": 2, "unit": "pieces"}],
+    )
+    assert ctx.deps.repos.recipes.canonical_ingredient_ids == [canonical_id]
 
 
 @pytest.mark.asyncio

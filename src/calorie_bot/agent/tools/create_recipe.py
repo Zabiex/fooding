@@ -45,7 +45,7 @@ async def create_recipe(
         description: Optional notes about the recipe.
         preparation_instructions: Ordered steps explaining how to prepare the recipe.
         source_url: URL where the recipe came from, if the user provided one.
-        ingredients: Optional ingredient list with quantities, units, and measurement systems.
+        ingredients: Optional ingredient list with quantities and units.
         tags: Optional labels such as "vegetarian", "meal-prep".
         overwrite_existing: Replace a recipe of the same name if one exists.
     """
@@ -69,9 +69,26 @@ async def create_recipe(
         tags=tags or [],
     )
 
-    recipe, was_updated = await ctx.deps.repos.recipes.save(
-        ctx.deps.user_id, draft, overwrite_existing=overwrite_existing
-    )
+    canonical_ingredient_ids = None
+    if draft.ingredients and ctx.deps.ingredient_resolver is not None:
+        try:
+            canonical_ingredient_ids = await ctx.deps.ingredient_resolver.resolve(
+                ctx.deps.repos.recipes, draft.ingredients
+            )
+        except Exception:
+            logger.warning("ingredient_resolution_failed; saving recipe with exact aliases", exc_info=True)
+
+    if canonical_ingredient_ids is None:
+        recipe, was_updated = await ctx.deps.repos.recipes.save(
+            ctx.deps.user_id, draft, overwrite_existing=overwrite_existing
+        )
+    else:
+        recipe, was_updated = await ctx.deps.repos.recipes.save(
+            ctx.deps.user_id,
+            draft,
+            overwrite_existing=overwrite_existing,
+            canonical_ingredient_ids=canonical_ingredient_ids,
+        )
     logger.info(
         "recipe_saved user=%s recipe=%s updated=%s",
         ctx.deps.user.telegram_user_id,

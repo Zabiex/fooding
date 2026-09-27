@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 NutritionAgent = Agent[AgentDeps, str]
 
 
-def build_model(settings: Settings) -> GoogleModel:
+def build_model(settings: Settings, model_name: str | None = None) -> GoogleModel | str:
     """Gemini 1.5 Flash through the Gemini API (Google AI Studio).
 
     Constructing the provider explicitly (rather than the `'google:gemini-1.5-flash'`
@@ -39,8 +39,10 @@ def build_model(settings: Settings) -> GoogleModel:
     except Exception:
         openrouter_key = None
 
+    selected_model = model_name or settings.model_name
+
     if openrouter_key:
-        model_id = settings.model_name
+        model_id = selected_model
         # Bare model names in this app target z-ai on OpenRouter. Explicit
         # provider/model values remain unchanged; multimodal models must use
         # their exact provider-qualified OpenRouter ID.
@@ -50,7 +52,11 @@ def build_model(settings: Settings) -> GoogleModel:
         return f"openrouter:{model_id}"
 
     provider = GoogleProvider(api_key=settings.google_api_key.get_secret_value())
-    return GoogleModel(settings.model_name, provider=provider)
+    if selected_model.startswith("google/"):
+        selected_model = selected_model.removeprefix("google/")
+    elif selected_model.startswith("google:"):
+        selected_model = selected_model.removeprefix("google:")
+    return GoogleModel(selected_model, provider=provider)
 
 
 def build_agent(settings: Settings) -> NutritionAgent:
