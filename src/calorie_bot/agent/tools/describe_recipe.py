@@ -29,6 +29,7 @@ async def describe_recipe(
         RecipeDescription(
             recipe_id=recipe.id,
             name=recipe.name,
+            source_url=recipe.source_url,
             servings=recipe.servings,
             ingredients=recipe.ingredients,
             preparation_instructions=(

@@ -22,6 +22,7 @@ class AgentDeps:
     repos: Repositories
     #: Where this turn came from, so logged entries are tagged text vs photo.
     input_source: EntrySource = EntrySource.TEXT
+    source_url: str | None = None
 
     @property
     def user_id(self):  # noqa: ANN201 - UUID, kept implicit for brevity

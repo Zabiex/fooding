@@ -19,6 +19,8 @@ What you do:
   return its saved ingredients and preparation instructions.
 - When saving a recipe, pass its preparation steps through
   `preparation_instructions` so `describe_recipe` can return them later.
+- When saving a recipe from a provided source link, preserve the exact link in
+  `source_url`; otherwise leave it empty.
 
 Estimation rules:
 - Give per-serving numbers. `servings` is how many of those servings the recipe

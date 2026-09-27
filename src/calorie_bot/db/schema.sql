@@ -95,6 +95,7 @@ begin
         name                text        not null check (length(btrim(name)) > 0),
         description         text,
         preparation_instructions text,
+        source_url          text,
         servings            double precision not null default 1 check (servings > 0),
         ingredients         jsonb       not null default '[]'::jsonb,
         calories            double precision not null check (calories >= 0),   -- per serving
@@ -110,6 +111,9 @@ begin
 
     alter table public.recipes
         add column if not exists preparation_instructions text;
+
+    alter table public.recipes
+        add column if not exists source_url text;
 
     -- One recipe name per user (case-insensitive). Different users may reuse names.
     create unique index if not exists recipes_user_name_uniq

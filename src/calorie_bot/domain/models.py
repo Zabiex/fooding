@@ -108,6 +108,7 @@ class RecipeDraft(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = Field(None, max_length=2000)
     preparation_instructions: str | None = Field(None, max_length=10000)
+    source_url: str | None = Field(None, max_length=2048)
     servings: float = Field(1.0, gt=0, description="How many servings the full recipe yields.")
     ingredients: list[Ingredient] = Field(default_factory=list)
     nutrition_per_serving: Nutrition
@@ -291,6 +292,7 @@ class RecipeMatch(BaseModel):
 class RecipeDescription(BaseModel):
     recipe_id: UUID
     name: str
+    source_url: str | None = None
     servings: float
     ingredients: list[Ingredient]
     preparation_instructions: str

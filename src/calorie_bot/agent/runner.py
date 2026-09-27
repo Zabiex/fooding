@@ -108,6 +108,7 @@ class AgentRunner:
         video_bytes: bytes,
         *,
         caption: str | None = None,
+        source_url: str | None = None,
     ) -> AgentReply:
         if len(video_bytes) > self._settings.max_video_bytes:
             raise AgentError("That video is too large for me to process. Try a shorter video.")
@@ -118,14 +119,28 @@ class AgentRunner:
             else VIDEO_PROMPT
         )
         prompt = [prompt_text, BinaryContent(data=video_bytes, media_type="video/mp4")]
-        return await self._run(user, prompt, EntrySource.VIDEO)
+        return await self._run(
+            user, prompt, EntrySource.VIDEO, source_url=source_url
+        )
 
     def reset(self, telegram_user_id: int) -> None:
         self._history.clear(telegram_user_id)
 
     # -- internals ------------------------------------------------------------
-    async def _run(self, user: UserProfile, prompt, source: EntrySource) -> AgentReply:
-        deps = AgentDeps(user=user, repos=self._repos, input_source=source)
+    async def _run(
+        self,
+        user: UserProfile,
+        prompt,
+        source: EntrySource,
+        *,
+        source_url: str | None = None,
+    ) -> AgentReply:
+        deps = AgentDeps(
+            user=user,
+            repos=self._repos,
+            input_source=source,
+            source_url=source_url,
+        )
 
         async with self._locks[user.telegram_user_id]:
             history = self._history.get(user.telegram_user_id)

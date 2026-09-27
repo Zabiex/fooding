@@ -244,17 +244,18 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     instagram_match = INSTAGRAM_URL.search(message.text)
     if instagram_match:
+        source_url = instagram_match.group(0).rstrip(".,!?")
         try:
             with tempfile.TemporaryDirectory(prefix="calorie-bot-") as directory:
                 video_path = await download_instagram_video(
-                    instagram_match.group(0).rstrip(".,!?"),
+                    source_url,
                     str(Path(directory) / "video.mp4"),
                     max_bytes=services.runner.max_video_bytes,
                     api_token=services.runner.apify_api_token,
                 )
                 video_bytes = Path(video_path).read_bytes()
                 reply = await services.runner.run_video(
-                    user, video_bytes, caption=message.text
+                    user, video_bytes, caption=message.text, source_url=source_url
                 )
         except AgentError as exc:
             await _reply(update, formatting.e(str(exc)))

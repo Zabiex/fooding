@@ -24,6 +24,7 @@ async def create_recipe(
     fiber_g_per_serving: float = 0.0,
     description: str | None = None,
     preparation_instructions: str | None = None,
+    source_url: str | None = None,
     ingredients: list[Ingredient] | None = None,
     tags: list[str] | None = None,
     overwrite_existing: bool = True,
@@ -43,6 +44,7 @@ async def create_recipe(
         fiber_g_per_serving: Grams of fiber in one serving.
         description: Optional notes about the recipe.
         preparation_instructions: Ordered steps explaining how to prepare the recipe.
+        source_url: URL where the recipe came from, if the user provided one.
         ingredients: Optional ingredient list with quantities and units.
         tags: Optional labels such as "vegetarian", "meal-prep".
         overwrite_existing: Replace a recipe of the same name if one exists.
@@ -60,6 +62,7 @@ async def create_recipe(
         name=name,
         description=description,
         preparation_instructions=preparation_instructions,
+        source_url=ctx.deps.source_url or source_url,
         servings=servings,
         ingredients=ingredients or [],
         nutrition_per_serving=per_serving,

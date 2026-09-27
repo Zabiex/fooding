@@ -100,7 +100,12 @@ class FakeRepos:
     users: object = None
 
 
-def make_ctx(user_id: UUID = USER_A, *, target: int | None = 2000) -> SimpleNamespace:
+def make_ctx(
+    user_id: UUID = USER_A,
+    *,
+    target: int | None = 2000,
+    source_url: str | None = None,
+) -> SimpleNamespace:
     user = UserProfile(
         id=user_id,
         telegram_user_id=999,
@@ -112,6 +117,7 @@ def make_ctx(user_id: UUID = USER_A, *, target: int | None = 2000) -> SimpleName
         user=user,
         repos=FakeRepos(FakeRecipeRepo(), FakeLogRepo()),  # type: ignore[arg-type]
         input_source=EntrySource.TEXT,
+        source_url=source_url,
     )
     return SimpleNamespace(deps=deps)
 
@@ -150,7 +156,8 @@ async def test_create_recipe_rejects_inconsistent_macros():
 
 @pytest.mark.asyncio
 async def test_describe_recipe_returns_saved_ingredients_and_instructions():
-    ctx = make_ctx()
+    source_url = "https://www.instagram.com/reel/example/"
+    ctx = make_ctx(source_url=source_url)
     await create_recipe(
         ctx,
         name="Tomato pasta",
@@ -163,8 +170,10 @@ async def test_describe_recipe_returns_saved_ingredients_and_instructions():
     assert len(details) == 1
     assert details[0].ingredients[0].name == "pasta"
     assert details[0].preparation_instructions.startswith("Boil pasta")
+    assert details[0].source_url == source_url
     saved_recipe = next(iter(ctx.deps.repos.recipes.rows.values()))
     assert saved_recipe.preparation_instructions.startswith("Boil pasta")
+    assert saved_recipe.source_url == source_url
 
 
 @pytest.mark.asyncio
