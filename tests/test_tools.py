@@ -15,7 +15,7 @@ import pytest
 from pydantic_ai import ModelRetry
 
 from calorie_bot.agent.dependencies import AgentDeps
-from calorie_bot.agent.tools import create_recipe, get_daily_summary, log_meal
+from calorie_bot.agent.tools import create_recipe, describe_recipe, get_daily_summary, log_meal
 from calorie_bot.domain.models import (
     EntrySource,
     LogEntry,
@@ -60,11 +60,11 @@ class FakeRecipeRepo:
         # The scoping rule under test: wrong owner -> nothing.
         return recipe if recipe and recipe.user_id == user_id else None
 
-    async def search(self, user_id, query, limit=5):
+    async def search(self, query, limit=5):
         return [
             r
             for r in self.rows.values()
-            if r.user_id == user_id and query.lower() in r.name.lower()
+            if query.lower() in r.name.lower()
         ][:limit]
 
 
@@ -146,6 +146,44 @@ async def test_create_recipe_rejects_inconsistent_macros():
             calories_per_serving=100,   # 90 g of fat is ~810 kcal on its own
             fat_g_per_serving=90,
         )
+
+
+@pytest.mark.asyncio
+async def test_describe_recipe_returns_saved_ingredients_and_instructions():
+    ctx = make_ctx()
+    await create_recipe(
+        ctx,
+        name="Tomato pasta",
+        calories_per_serving=400,
+        description="Boil pasta, then toss with simmered tomato sauce.",
+        ingredients=[{"name": "pasta", "quantity": 100, "unit": "g"}],
+    )
+
+    details = await describe_recipe(ctx, "Tomato pasta")
+    assert len(details) == 1
+    assert details[0].ingredients[0].name == "pasta"
+    assert details[0].preparation_instructions.startswith("Boil pasta")
+
+
+@pytest.mark.asyncio
+async def test_describe_recipe_can_return_shared_catalog_recipe():
+    ctx = make_ctx(USER_A)
+    foreign = Recipe(
+        id=uuid4(),
+        user_id=USER_B,
+        name="Private curry",
+        servings=1,
+        ingredients=[],
+        nutrition_per_serving=Nutrition(calories=600),
+        tags=[],
+        created_at=datetime.now(tz=timezone.utc),
+        updated_at=datetime.now(tz=timezone.utc),
+    )
+    ctx.deps.repos.recipes.rows[foreign.id] = foreign
+
+    details = await describe_recipe(ctx, "Private curry")
+    assert len(details) == 1
+    assert details[0].name == "Private curry"
 
 
 @pytest.mark.asyncio

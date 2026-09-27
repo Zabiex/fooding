@@ -40,7 +40,7 @@ async def create_recipe(
         carbs_g_per_serving: Grams of carbohydrate in one serving.
         fat_g_per_serving: Grams of fat in one serving.
         fiber_g_per_serving: Grams of fiber in one serving.
-        description: Optional method or notes.
+        description: Preparation steps and useful notes to return when the user asks how to make this recipe.
         ingredients: Optional ingredient list with quantities and units.
         tags: Optional labels such as "vegetarian", "meal-prep".
         overwrite_existing: Replace a recipe of the same name if one exists.

@@ -285,3 +285,11 @@ class RecipeMatch(BaseModel):
     name: str
     servings: float
     nutrition_per_serving: Nutrition
+
+
+class RecipeDescription(BaseModel):
+    recipe_id: UUID
+    name: str
+    servings: float
+    ingredients: list[Ingredient]
+    preparation_instructions: str
