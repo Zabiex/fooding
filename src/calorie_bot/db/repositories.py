@@ -124,6 +124,7 @@ def _log_exercise_entry_from_row(row: Row) -> ExerciseEntry:
         entry_id=row["id"],
         user=row["user_id"],
         exercise_id=row["exercise_id"],
+        exercise_name=row.get("exercise_name"),
         duration_seconds=row["duration"],
         reps=row["reps"],
         sets=row["sets"],
@@ -163,8 +164,10 @@ _MEAL_COLUMNS = """
 """
 
 _EXERCISE_COLUMNS = """
-    id, user_id, exercise_id, duration, reps, sets, weight, 
-    calories_burned, logged_at, created_at
+    exercise_log.id, exercise_log.user_id, exercise_log.exercise_id,
+    exercise.name as exercise_name,
+    exercise_log.duration, exercise_log.reps, exercise_log.sets, exercise_log.weight,
+    exercise_log.calories_burned, exercise_log.logged_at, exercise_log.created_at
 """
 
 
@@ -778,10 +781,21 @@ class LogExerciseEntry:
             f"""
             insert into public.exercise_log
                 (user_id, exercise_id, duration, reps, sets, weight,
-                 calories_burned, logged_at, created_at)
+                 calories_burned, logged_at)
             values ($1, $2, $3, $4, $5, $6,
-                    $7, $8, $9)
-            returning {_EXERCISE_COLUMNS}
+                    $7, $8)
+            returning
+                exercise_log.id,
+                exercise_log.user_id,
+                exercise_log.exercise_id,
+                (select e.name from public.exercise e where e.id = exercise_log.exercise_id) as exercise_name,
+                exercise_log.duration,
+                exercise_log.reps,
+                exercise_log.sets,
+                exercise_log.weight,
+                exercise_log.calories_burned,
+                exercise_log.logged_at,
+                exercise_log.created_at
             """,
             user_id,
             draft.exercise_id,
@@ -804,9 +818,11 @@ class LogExerciseEntry:
             start_utc, end_utc = day_bounds_utc(day, timezone_name)
             rows = await self._pool.fetch(
                 f"""
-                select {_EXERCISE_COLUMNS} from public.exercise_log
-                 where user_id = $1 and logged_at >= $2 and logged_at < $3
-                 order by logged_at asc
+                select {_EXERCISE_COLUMNS}
+                  from public.exercise_log
+                  left join public.exercise on public.exercise.id = public.exercise_log.exercise_id
+                 where public.exercise_log.user_id = $1 and public.exercise_log.logged_at >= $2 and public.exercise_log.logged_at < $3
+                 order by public.exercise_log.logged_at asc
                 """,
                 user_id,
                 start_utc,
@@ -817,10 +833,12 @@ class LogExerciseEntry:
     async def list_recent(self, user_id: UUID, limit: int = 10) -> list[ExerciseEntry]:
         rows = await self._pool.fetch(
             f"""
-            select {_EXERCISE_COLUMNS} from public.exercise_log
-                where user_id = $1
-                order by logged_at desc
-                limit $2
+            select {_EXERCISE_COLUMNS}
+              from public.exercise_log
+              left join public.exercise on public.exercise.id = public.exercise_log.exercise_id
+             where public.exercise_log.user_id = $1
+             order by public.exercise_log.logged_at desc
+             limit $2
             """,
             user_id,
             limit,
@@ -845,7 +863,18 @@ class LogExerciseEntry:
                     order by created_at desc
                     limit 1
                 )
-            returning {_EXERCISE_COLUMNS}
+            returning
+                exercise_log.id,
+                exercise_log.user_id,
+                exercise_log.exercise_id,
+                (select e.name from public.exercise e where e.id = exercise_log.exercise_id) as exercise_name,
+                exercise_log.duration,
+                exercise_log.reps,
+                exercise_log.sets,
+                exercise_log.weight,
+                exercise_log.calories_burned,
+                exercise_log.logged_at,
+                exercise_log.created_at
             """,
             user_id,
         )

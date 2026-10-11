@@ -229,6 +229,7 @@ class ExerciseEntry(BaseModel):
     entry_id: UUID
     user: UUID
     exercise_id: UUID
+    exercise_name: str | None = None
     duration_seconds: float | None
     reps: int | None
     sets: int | None
@@ -236,6 +237,10 @@ class ExerciseEntry(BaseModel):
     calories_burned: float
     logged_at: datetime
     created_at: datetime
+
+    @property
+    def duration(self) -> float:
+        return float(self.duration_seconds or 0.0)
 
 # =============================================================================
 # Users

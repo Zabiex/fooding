@@ -104,8 +104,9 @@ def format_exercise_log_list(exercise_logs: list) -> str:
         return "You haven't logged any exercises yet. Describe an exercise and I'll store it."
     lines = ["🏋️ <b>Your exercise logs</b>", ""]
     for log in exercise_logs:
+        name = log.exercise_name or "Exercise"
         lines.append(
-            f"• <b>{e(log.exercise_name)}</b> — {log.duration:.0f} min, "
+            f"• <b>{e(name)}</b> — {log.duration:.0f} min, "
             f"{log.reps or 0} reps, {log.sets or 0} sets, "
             f"{log.weight or 0:.1f} kg, {log.calories_burned or 0:.0f} kcal burned"
         )
