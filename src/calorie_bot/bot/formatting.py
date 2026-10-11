@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from html import escape
 
-from ..domain.models import DailySummary, LogEntry, Recipe
+from ..domain.models import DailySummary, MealEntry, Recipe
 from ..services.nutrition import progress_bar
 from ..services.timeframes import to_local
 
@@ -43,7 +43,7 @@ def split_message(text: str) -> list[str]:
     return chunks
 
 
-def format_entry_line(entry: LogEntry, timezone_name: str) -> str:
+def format_entry_line(entry: MealEntry, timezone_name: str) -> str:
     local_time = to_local(entry.logged_at, timezone_name).strftime("%H:%M")
     emoji = MEAL_EMOJI.get(entry.meal_type.value, "🍴")
     servings = f" ×{entry.servings:g}" if entry.servings != 1 else ""
@@ -99,10 +99,21 @@ def format_recipe_list(recipes: list[Recipe]) -> str:
         )
     return "\n".join(lines)
 
+def format_exercise_log_list(exercise_logs: list) -> str:
+    if not exercise_logs:
+        return "You haven't logged any exercises yet. Describe an exercise and I'll store it."
+    lines = ["🏋️ <b>Your exercise logs</b>", ""]
+    for log in exercise_logs:
+        lines.append(
+            f"• <b>{e(log.exercise_name)}</b> — {log.duration:.0f} min, "
+            f"{log.reps or 0} reps, {log.sets or 0} sets, "
+            f"{log.weight or 0:.1f} kg, {log.calories_burned or 0:.0f} kcal burned"
+        )
+    return "\n".join(lines)
 
 WELCOME = (
     "👋 <b>Hi! I'm your food diary.</b>\n\n"
-    "Just tell me what you ate, or send a photo of your plate:\n"
+    "Just tell me what you ate, or send a photo of your plate. You can also tell me about your exercises:\n"
     "• <i>two eggs and a slice of rye toast</i>\n"
     "• <i>big bowl of chicken curry with rice</i>\n"
     "• 📷 a picture of your lunch\n\n"
@@ -113,6 +124,7 @@ WELCOME = (
     "/target 2200 — set a daily calorie goal (or /target off to clear it)\n"
     "/timezone Europe/Helsinki — set your timezone\n"
     "/recipes — your saved recipes\n"
+    "/exercise_log — your exercise log\n"
     "/undo — remove the last entry\n"
     "/reset — forget the current conversation\n\n"
     "<i>Estimates are approximate and not medical advice.</i>"

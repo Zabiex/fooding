@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic_ai import ModelRetry, RunContext
 
-from ...domain.models import LogEntryDraft, MealLogged, MealType, Nutrition
+from ...domain.models import MealEntryDraft, MealLogged, MealType, Nutrition
 from ...services import nutrition as nutrition_service
 from ..dependencies import AgentDeps
 from .common import validate_macros
@@ -89,7 +89,7 @@ async def log_meal(
         raise ModelRetry("servings must be greater than zero.")
 
     logged_at = deps.now_local() - timedelta(hours=max(0.0, hours_ago))
-    draft = LogEntryDraft(
+    draft = MealEntryDraft(
         description=description.strip(),
         meal_type=meal_type,
         source=deps.input_source,
@@ -100,12 +100,12 @@ async def log_meal(
         raw_input=None,
         logged_at=logged_at,
     )
-    entry = await deps.repos.log_entries.create(
+    entry = await deps.repos.meal_entries.create(
         deps.user_id, draft, timezone_name=deps.timezone
     )
 
     day = logged_at.date()
-    entries = await deps.repos.log_entries.list_for_day(deps.user_id, day, deps.timezone)
+    entries = await deps.repos.meal_entries.list_for_day(deps.user_id, day, deps.timezone)
     summary = nutrition_service.build_daily_summary(
         user=deps.user, day=day, entries=entries, include_entries=False
     )

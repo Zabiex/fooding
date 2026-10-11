@@ -17,9 +17,13 @@ import asyncpg
 
 from ..domain.models import (
     EntrySource,
+    ExerciseEntry,
+    ExerciseEntryDraft,
+    Exercise,
+    ExerciseDraft,
     Ingredient,
-    LogEntry,
-    LogEntryDraft,
+    MealEntry,
+    MealEntryDraft,
     MealType,
     Nutrition,
     Recipe,
@@ -83,8 +87,8 @@ def _recipe_from_row(row: Row) -> Recipe:
     )
 
 
-def _log_entry_from_row(row: Row) -> LogEntry:
-    return LogEntry(
+def _log_meal_from_row(row: Row) -> MealEntry:
+    return MealEntry(
         id=row["id"],
         user_id=row["user_id"],
         recipe_id=row["recipe_id"],
@@ -98,6 +102,36 @@ def _log_entry_from_row(row: Row) -> LogEntry:
         created_at=row["created_at"],
     )
 
+
+def _exercise_from_row(row: Row) -> Exercise:
+    muscle_group_value = row.get("muscle_group") or row.get("muscle_groups")
+    muscle_groups: list[str] = []
+    if isinstance(muscle_group_value, str):
+        muscle_groups = [part.strip() for part in muscle_group_value.split(",") if part.strip()]
+    elif muscle_group_value:
+        muscle_groups = [str(part).strip() for part in muscle_group_value if str(part).strip()]
+    return Exercise(
+        exercise_id=row["id"],
+        name=row["name"],
+        description=row["description"],
+        tips=row["tips"],
+        muscle_groups=muscle_groups,
+    )
+
+
+def _log_exercise_entry_from_row(row: Row) -> ExerciseEntry:
+    return ExerciseEntry(
+        entry_id=row["id"],
+        user=row["user_id"],
+        exercise_id=row["exercise_id"],
+        duration_seconds=row["duration"],
+        reps=row["reps"],
+        sets=row["sets"],
+        weight=row["weight"],
+        calories_burned=row["calories_burned"],
+        logged_at=row["logged_at"],
+        created_at=row["created_at"],
+    )
 
 _RECIPE_COLUMNS = """
     recipes.id, recipes.user_id, recipes.name, recipes.description,
@@ -122,10 +156,15 @@ _RECIPE_COLUMNS = """
     recipes.tags, recipes.is_archived, recipes.created_at, recipes.updated_at
 """
 
-_LOG_COLUMNS = """
+_MEAL_COLUMNS = """
     id, user_id, recipe_id, description, meal_type, source, servings,
     calories, protein_g, carbs_g, fat_g, fiber_g,
     confidence, logged_at, created_at
+"""
+
+_EXERCISE_COLUMNS = """
+    id, user_id, exercise_id, duration, reps, sets, weight, 
+    calories_burned, logged_at, created_at
 """
 
 
@@ -508,19 +547,19 @@ class RecipeRepository:
 
 
 # =============================================================================
-# Log entries
+# Meal entries
 # =============================================================================
-class LogEntryRepository:
+class LogMealRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
     async def create(
         self,
         user_id: UUID,
-        draft: LogEntryDraft,
+        draft: MealEntryDraft,
         *,
         timezone_name: str = "UTC",
-    ) -> LogEntry:
+    ) -> MealEntry:
         total = draft.nutrition_total
         logged_at = (
             to_utc(draft.logged_at, timezone_name)
@@ -536,7 +575,7 @@ class LogEntryRepository:
                  confidence, raw_input, logged_at)
             values ($1, $2, $3, $4::public.meal_type, $5::public.entry_source, $6,
                     $7, $8, $9, $10, $11, $12, $13, $14)
-            returning {_LOG_COLUMNS}
+            returning {_MEAL_COLUMNS}
             """,
             user_id,
             draft.recipe_id,
@@ -554,18 +593,18 @@ class LogEntryRepository:
             logged_at,
         )
         assert row is not None
-        return _log_entry_from_row(row)
+        return _log_meal_from_row(row)
 
     async def list_for_day(
         self,
         user_id: UUID,
         day: date,
         timezone_name: str,
-    ) -> list[LogEntry]:
+    ) -> list[MealEntry]:
         start_utc, end_utc = day_bounds_utc(day, timezone_name)
         rows = await self._pool.fetch(
             f"""
-            select {_LOG_COLUMNS} from public.log_entries
+            select {_MEAL_COLUMNS} from public.log_entries
              where user_id = $1 and logged_at >= $2 and logged_at < $3
              order by logged_at asc
             """,
@@ -573,12 +612,12 @@ class LogEntryRepository:
             start_utc,
             end_utc,
         )
-        return [_log_entry_from_row(row) for row in rows]
+        return [_log_meal_from_row(row) for row in rows]
 
-    async def list_recent(self, user_id: UUID, limit: int = 10) -> list[LogEntry]:
+    async def list_recent(self, user_id: UUID, limit: int = 10) -> list[MealEntry]:
         rows = await self._pool.fetch(
             f"""
-            select {_LOG_COLUMNS} from public.log_entries
+            select {_MEAL_COLUMNS} from public.log_entries
              where user_id = $1
              order by logged_at desc
              limit $2
@@ -586,7 +625,7 @@ class LogEntryRepository:
             user_id,
             limit,
         )
-        return [_log_entry_from_row(row) for row in rows]
+        return [_log_meal_from_row(row) for row in rows]
 
     async def delete(self, user_id: UUID, entry_id: UUID) -> bool:
         result = await self._pool.execute(
@@ -596,7 +635,7 @@ class LogEntryRepository:
         )
         return result.endswith("1")
 
-    async def delete_latest(self, user_id: UUID) -> LogEntry | None:
+    async def delete_latest(self, user_id: UUID) -> MealEntry | None:
         row = await self._pool.fetchrow(
             f"""
             delete from public.log_entries
@@ -606,12 +645,211 @@ class LogEntryRepository:
                   order by created_at desc
                   limit 1
              )
-            returning {_LOG_COLUMNS}
+            returning {_MEAL_COLUMNS}
             """,
             user_id,
         )
-        return _log_entry_from_row(row) if row else None
+        return _log_meal_from_row(row) if row else None
 
+
+# =============================================================================
+# Exercise catalog
+# =============================================================================
+class ExerciseRepository:
+    def __init__(self, pool: asyncpg.Pool) -> None:
+        self._pool = pool
+
+    async def save(
+        self,
+        user_id: UUID,
+        draft: ExerciseDraft,
+        *,
+        overwrite_existing: bool = True,
+    ) -> tuple[Exercise, bool]:
+        async with self._pool.acquire() as connection:
+            async with connection.transaction():
+                existing = await connection.fetchrow(
+                    """
+                    select id from public.exercise
+                     where user_id = $1 and lower(btrim(name)) = lower(btrim($2))
+                     for update
+                    """,
+                    user_id,
+                    draft.name,
+                )
+
+                if existing and not overwrite_existing:
+                    row = await connection.fetchrow(
+                        """
+                        select id, user_id, name, description, muscle_group, tips
+                          from public.exercise
+                         where id = $1 and user_id = $2
+                        """,
+                        existing["id"],
+                        user_id,
+                    )
+                    assert row is not None
+                    return _exercise_from_row(row), False
+
+                if existing:
+                    row = await connection.fetchrow(
+                        """
+                        update public.exercise
+                           set name = $3,
+                               description = $4,
+                               muscle_group = $5,
+                               tips = $6
+                         where id = $1 and user_id = $2
+                        returning id, user_id, name, description, muscle_group, tips
+                        """,
+                        existing["id"],
+                        user_id,
+                        draft.name,
+                        draft.description,
+                        ", ".join(draft.muscle_groups),
+                        draft.tips,
+                    )
+                    assert row is not None
+                    return _exercise_from_row(row), True
+
+                row = await connection.fetchrow(
+                    """
+                    insert into public.exercise
+                        (user_id, name, description, muscle_group, tips)
+                    values ($1, $2, $3, $4, $5)
+                    returning id, user_id, name, description, muscle_group, tips
+                    """,
+                    user_id,
+                    draft.name,
+                    draft.description,
+                    ", ".join(draft.muscle_groups),
+                    draft.tips,
+                )
+                assert row is not None
+                return _exercise_from_row(row), False
+
+    async def get(self, exercise_id: UUID) -> Exercise | None:
+        row = await self._pool.fetchrow(
+            """
+            select id, user_id, name, description, muscle_group, tips
+              from public.exercise
+             where id = $1
+            """,
+            exercise_id,
+        )
+        return _exercise_from_row(row) if row else None
+
+    async def search(self, query: str, limit: int = 5) -> list[Exercise]:
+        rows = await self._pool.fetch(
+            """
+            select id, user_id, name, description, muscle_group, tips
+              from public.exercise
+             where name ilike '%' || $1 || '%' or similarity(name, $1) > 0.2
+             order by similarity(name, $1) desc, name asc
+             limit $2
+            """,
+            query,
+            limit,
+        )
+        return [_exercise_from_row(row) for row in rows]
+
+
+# =============================================================================
+# Exercise entries
+# =============================================================================
+class LogExerciseEntry:
+    def __init__(self, pool: asyncpg.Pool) -> None:
+        self._pool = pool
+
+    async def create(
+        self,
+        user_id: UUID,
+        draft: ExerciseEntryDraft,
+        *,
+        timezone_name: str = "UTC",
+    ) -> ExerciseEntry:
+        logged_at = (
+            to_utc(draft.logged_at, timezone_name)
+            if draft.logged_at is not None
+            else datetime.now(tz=dt_timezone.utc)
+        )
+
+        row = await self._pool.fetchrow(
+            f"""
+            insert into public.exercise_log
+                (user_id, exercise_id, duration, reps, sets, weight,
+                 calories_burned, logged_at, created_at)
+            values ($1, $2, $3, $4, $5, $6,
+                    $7, $8, $9)
+            returning {_EXERCISE_COLUMNS}
+            """,
+            user_id,
+            draft.exercise_id,
+            draft.duration_seconds,
+            draft.reps,
+            draft.sets,
+            draft.weight,
+            draft.calories_burned,
+            logged_at,
+        )
+        assert row is not None
+        return _log_exercise_entry_from_row(row)
+
+    async def list_for_day(
+            self,
+            user_id: UUID,
+            day: date,
+            timezone_name: str,
+        ) -> list[ExerciseEntry]:
+            start_utc, end_utc = day_bounds_utc(day, timezone_name)
+            rows = await self._pool.fetch(
+                f"""
+                select {_EXERCISE_COLUMNS} from public.exercise_log
+                 where user_id = $1 and logged_at >= $2 and logged_at < $3
+                 order by logged_at asc
+                """,
+                user_id,
+                start_utc,
+                end_utc,
+            )
+            return [_log_exercise_entry_from_row(row) for row in rows]
+    
+    async def list_recent(self, user_id: UUID, limit: int = 10) -> list[ExerciseEntry]:
+        rows = await self._pool.fetch(
+            f"""
+            select {_EXERCISE_COLUMNS} from public.exercise_log
+                where user_id = $1
+                order by logged_at desc
+                limit $2
+            """,
+            user_id,
+            limit,
+        )
+        return [_log_exercise_entry_from_row(row) for row in rows]
+
+    async def delete(self, user_id: UUID, entry_id: UUID) -> bool:
+        result = await self._pool.execute(
+            "delete from public.exercise_log where id = $1 and user_id = $2",
+            entry_id,
+            user_id,
+        )
+        return result.endswith("1")
+
+    async def delete_latest(self, user_id: UUID) -> ExerciseEntry | None:
+        row = await self._pool.fetchrow(
+            f"""
+            delete from public.exercise_log
+                where id = (
+                    select id from public.exercise_log
+                    where user_id = $1
+                    order by created_at desc
+                    limit 1
+                )
+            returning {_EXERCISE_COLUMNS}
+            """,
+            user_id,
+        )
+        return _log_exercise_entry_from_row(row) if row else None
 
 # =============================================================================
 # Container passed around as a single dependency
@@ -620,12 +858,16 @@ class LogEntryRepository:
 class Repositories:
     users: UserRepository
     recipes: RecipeRepository
-    log_entries: LogEntryRepository
+    exercises: ExerciseRepository
+    log_entries: LogMealRepository
+    exercise_entries: LogExerciseEntry
 
     @classmethod
     def from_pool(cls, pool: asyncpg.Pool) -> "Repositories":
         return cls(
             users=UserRepository(pool),
             recipes=RecipeRepository(pool),
-            log_entries=LogEntryRepository(pool),
+            exercises=ExerciseRepository(pool),
+            log_entries=LogMealRepository(pool),
+            exercise_entries=LogExerciseEntry(pool),
         )

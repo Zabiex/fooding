@@ -9,7 +9,7 @@ from datetime import date
 
 from ..domain.models import (
     DailySummary,
-    LogEntry,
+    MealEntry,
     MealBreakdown,
     MealType,
     Nutrition,
@@ -47,7 +47,7 @@ def macros_are_consistent(nutrition: Nutrition, tolerance: float = MACRO_TOLERAN
     return abs(derived - nutrition.calories) / nutrition.calories <= tolerance
 
 
-def group_by_meal(entries: list[LogEntry]) -> list[MealBreakdown]:
+def group_by_meal(entries: list[MealEntry]) -> list[MealBreakdown]:
     buckets: dict[MealType, list[Nutrition]] = defaultdict(list)
     for entry in entries:
         buckets[entry.meal_type].append(entry.nutrition)
@@ -68,7 +68,7 @@ def build_daily_summary(
     *,
     user: UserProfile,
     day: date,
-    entries: list[LogEntry],
+    entries: list[MealEntry],
     include_entries: bool = True,
 ) -> DailySummary:
     totals = Nutrition.sum(entry.nutrition for entry in entries).rounded()

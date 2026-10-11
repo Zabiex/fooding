@@ -207,6 +207,11 @@ async def recipes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     recipes = await services.repos.recipes.list_recent(limit=25)
     await _reply(update, formatting.format_recipe_list(recipes))
 
+async def exercise_log_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = await _current_user(update, context)
+    services = _services(context)
+    exercise_logs = await services.repos.exercise_entries.list_recent(user.id, limit=25)
+    await _reply(update, formatting.format_exercise_log_list(exercise_logs))
 
 async def undo_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = await _current_user(update, context)
@@ -372,6 +377,7 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("recipes", recipes_command))
     application.add_handler(CommandHandler("undo", undo_command))
     application.add_handler(CommandHandler("reset", reset_command))
+    application.add_handler(CommandHandler("exercise_log", exercise_log_command))
 
     application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
     application.add_handler(MessageHandler(filters.Document.IMAGE, document_photo_handler))

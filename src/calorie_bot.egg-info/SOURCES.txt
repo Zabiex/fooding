@@ -14,7 +14,13 @@ src/calorie_bot/agent/nutrition_agent.py
 src/calorie_bot/agent/openrouter_model.py
 src/calorie_bot/agent/prompts.py
 src/calorie_bot/agent/runner.py
-src/calorie_bot/agent/tools.py
+src/calorie_bot/agent/tools/__init__.py
+src/calorie_bot/agent/tools/common.py
+src/calorie_bot/agent/tools/create_recipe.py
+src/calorie_bot/agent/tools/describe_recipe.py
+src/calorie_bot/agent/tools/find_recipe.py
+src/calorie_bot/agent/tools/get_daily_summary.py
+src/calorie_bot/agent/tools/log_meal.py
 src/calorie_bot/bot/app.py
 src/calorie_bot/bot/formatting.py
 src/calorie_bot/bot/handlers.py
@@ -24,6 +30,9 @@ src/calorie_bot/db/schema.py
 src/calorie_bot/db/schema.sql
 src/calorie_bot/domain/models.py
 src/calorie_bot/services/genai.py
+src/calorie_bot/services/ingredient_resolver.py
+src/calorie_bot/services/instagram.py
 src/calorie_bot/services/nutrition.py
 src/calorie_bot/services/timeframes.py
+tests/test_ingredient_resolver.py
 tests/test_tools.py

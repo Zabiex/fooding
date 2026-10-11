@@ -143,9 +143,9 @@ class Recipe(RecipeDraft):
 
 
 # =============================================================================
-# Log entries
+# Meal entries
 # =============================================================================
-class LogEntryDraft(BaseModel):
+class MealEntryDraft(BaseModel):
     """A consumption event as proposed by the agent, before it is persisted."""
 
     description: str = Field(..., min_length=1, max_length=500)
@@ -164,8 +164,7 @@ class LogEntryDraft(BaseModel):
     def nutrition_total(self) -> Nutrition:
         return self.nutrition_per_serving.scaled(self.servings)
 
-
-class LogEntry(BaseModel):
+class MealEntry(BaseModel):
     """A persisted consumption event. `nutrition` is the total for the entry."""
 
     id: UUID
@@ -180,6 +179,63 @@ class LogEntry(BaseModel):
     logged_at: datetime
     created_at: datetime
 
+# =============================================================================
+# Exercise entries
+# =============================================================================
+
+class Exercise(BaseModel):
+    exercise_id: UUID
+    name: str
+    description: str | None = None
+    tips: str | None = None
+    muscle_groups: list[str] = Field(default_factory=list)
+
+class ExerciseDraft(BaseModel):
+    """A new exercise as proposed by the agent, before it is persisted."""
+
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str | None = Field(None, max_length=2000)
+    tips: str | None = Field(None, max_length=10000)
+    muscle_groups: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Exercise name cannot be blank.")
+        return cleaned
+
+    @field_validator("muscle_groups")
+    @classmethod
+    def _normalize_muscle_groups(cls, values: list[str]) -> list[str]:
+        return [group.strip().lower() for group in values if group.strip()]
+
+class ExerciseEntryDraft(BaseModel):
+    """An exercise log entry as proposed by the agent, before it is persisted."""
+
+    user: UUID
+    exercise_id: UUID | None = None
+    duration_seconds: float = Field(..., gt=0)
+    reps: int | None = Field(None, gt=0)
+    sets: int | None = Field(None, gt=0)
+    weight: float | None = Field(None, gt=0)
+    calories_burned: float = Field(..., ge=0)
+    logged_at: datetime | None = Field(
+        None, description="When the exercise was performed. Defaults to now."
+    )
+
+class ExerciseEntry(BaseModel):
+    entry_id: UUID
+    user: UUID
+    exercise_id: UUID
+    duration_seconds: float | None
+    reps: int | None
+    sets: int | None
+    weight: float | None
+    calories_burned: float
+    logged_at: datetime
+    created_at: datetime
 
 # =============================================================================
 # Users
@@ -255,7 +311,7 @@ class DailySummary(BaseModel):
     calorie_target: int | None = None
     calories_remaining: float | None = None
     percent_of_target: float | None = None
-    entries: list[LogEntry] = Field(default_factory=list)
+    entries: list[MealEntry] = Field(default_factory=list)
 
 
 # =============================================================================
@@ -296,3 +352,24 @@ class RecipeDescription(BaseModel):
     servings: float
     ingredients: list[Ingredient]
     preparation_instructions: str
+
+
+class ExerciseSaved(BaseModel):
+    exercise_id: UUID
+    name: str
+    description: str | None = None
+    tips: str | None = None
+    muscle_groups: list[str] = Field(default_factory=list)
+    was_updated: bool = Field(
+        False, description="True when an existing exercise with the same name was overwritten."
+    )
+
+
+class ExerciseDescription(BaseModel):
+    exercise_id: UUID
+    name: str
+    description: str | None = None
+    tips: str | None = None
+    muscle_groups: list[str] = Field(default_factory=list)
+
+

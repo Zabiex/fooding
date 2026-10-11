@@ -18,8 +18,8 @@ from calorie_bot.agent.dependencies import AgentDeps
 from calorie_bot.agent.tools import create_recipe, describe_recipe, get_daily_summary, log_meal
 from calorie_bot.domain.models import (
     EntrySource,
-    LogEntry,
-    LogEntryDraft,
+    MealEntry,
+    MealEntryDraft,
     MealType,
     Nutrition,
     Recipe,
@@ -79,10 +79,10 @@ class FakeRecipeRepo:
 
 class FakeLogRepo:
     def __init__(self) -> None:
-        self.rows: list[LogEntry] = []
+        self.rows: list[MealEntry] = []
 
-    async def create(self, user_id, draft: LogEntryDraft, *, timezone_name="UTC"):
-        entry = LogEntry(
+    async def create(self, user_id, draft: MealEntryDraft, *, timezone_name="UTC"):
+        entry = MealEntry(
             id=uuid4(),
             user_id=user_id,
             recipe_id=draft.recipe_id,

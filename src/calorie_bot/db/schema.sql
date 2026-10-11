@@ -53,6 +53,13 @@ begin
         alter type public.entry_source add value if not exists 'video';
     end if;
 
+    if not exists (select 1 from pg_type where typname = 'exercise_type') then
+        create type public.exercise_type as enum (
+            'strength', 'cardio', 'flexibility', 'warmup', 'cooldown', 'other'
+        );
+    end if;
+        
+
     ---------------------------------------------------------------------------
     -- users
     --
@@ -138,6 +145,32 @@ begin
         unit          text,
         note          text,
         position      integer not null default 0 check (position >= 0)
+    );
+
+    create table if not exists public.exercise(
+        
+        id               uuid primary key default gen_random_uuid(),
+        user_id          uuid        not null references public.users (id) on delete cascade,
+        name             text        not null check (length(btrim(name)) > 0),
+        description      text,
+        muscle_group     text,
+        type             public.exercise_type,
+        difficulty_level text,
+        tips             text,
+        created_at       timestamptz not null default now()
+    );
+
+    create table if not exists public.exercise_log(
+        id              uuid primary key default gen_random_uuid(),
+        user_id         uuid        not null references public.users (id) on delete cascade,
+        exercise_id     uuid        not null references public.exercise (id) on delete cascade,
+        duration        double precision check (duration is null or duration >= 0),
+        reps            integer check (reps is null or reps >= 0),
+        sets            integer check (sets is null or sets >= 0),
+        weight          double precision check (weight is null or weight >= 0),
+        calories_burned double precision check (calories_burned is null or calories_burned >= 0),
+        logged_at       timestamptz not null default now(),
+        created_at      timestamptz not null default now()
     );
 
     alter table public.recipe_ingredients
