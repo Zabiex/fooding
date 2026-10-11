@@ -25,6 +25,7 @@ BOT_COMMANDS = [
     BotCommand("today", "Today's food log"),
     BotCommand("yesterday", "Yesterday's food log"),
     BotCommand("recipes", "Your saved recipes"),
+    BotCommand("exercises", "List available exercises"),
     BotCommand("exercise_log", "Your exercise log"),
     BotCommand("target", "Set your daily calorie goal"),
     BotCommand("timezone", "Set your timezone"),

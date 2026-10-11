@@ -684,12 +684,11 @@ class ExerciseRepository:
                 if existing and not overwrite_existing:
                     row = await connection.fetchrow(
                         """
-                        select id, user_id, name, description, muscle_group, tips
+                        select id, name, description, muscle_group, tips
                           from public.exercise
-                         where id = $1 and user_id = $2
+                         where id = $1
                         """,
                         existing["id"],
-                        user_id,
                     )
                     assert row is not None
                     return _exercise_from_row(row), False
@@ -734,7 +733,7 @@ class ExerciseRepository:
     async def get(self, exercise_id: UUID) -> Exercise | None:
         row = await self._pool.fetchrow(
             """
-            select id, user_id, name, description, muscle_group, tips
+            select id, name, description, muscle_group, tips
               from public.exercise
              where id = $1
             """,
@@ -742,10 +741,20 @@ class ExerciseRepository:
         )
         return _exercise_from_row(row) if row else None
 
+    async def list_all(self) -> list[Exercise]:
+        rows = await self._pool.fetch(
+            """
+            select id, name, description, muscle_group, tips
+              from public.exercise
+             order by name asc
+            """
+        )
+        return [_exercise_from_row(row) for row in rows]
+
     async def search(self, query: str, limit: int = 5) -> list[Exercise]:
         rows = await self._pool.fetch(
             """
-            select id, user_id, name, description, muscle_group, tips
+            select id, name, description, muscle_group, tips
               from public.exercise
              where name ilike '%' || $1 || '%' or similarity(name, $1) > 0.2
              order by similarity(name, $1) desc, name asc

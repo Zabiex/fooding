@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from html import escape
 
-from ..domain.models import DailySummary, MealEntry, Recipe
+from ..domain.models import DailySummary, Exercise, MealEntry, Recipe
 from ..services.nutrition import progress_bar
 from ..services.timeframes import to_local
 
@@ -112,6 +112,16 @@ def format_exercise_log_list(exercise_logs: list) -> str:
         )
     return "\n".join(lines)
 
+
+def format_exercise_list(exercises: list[Exercise]) -> str:
+    if not exercises:
+        return "There are no exercises in the catalog yet."
+    lines = ["🏋️ <b>Exercises</b>", ""]
+    for exercise in exercises:
+        muscle_groups = f" — {e(', '.join(exercise.muscle_groups))}" if exercise.muscle_groups else ""
+        lines.append(f"• <b>{e(exercise.name)}</b>{muscle_groups}")
+    return "\n".join(lines)
+
 WELCOME = (
     "👋 <b>Hi! I'm your food diary.</b>\n\n"
     "Just tell me what you ate, or send a photo of your plate. You can also tell me about your exercises:\n"
@@ -125,6 +135,7 @@ WELCOME = (
     "/target 2200 — set a daily calorie goal (or /target off to clear it)\n"
     "/timezone Europe/Helsinki — set your timezone\n"
     "/recipes — your saved recipes\n"
+    "/exercises — list available exercises\n"
     "/exercise_log — your exercise log\n"
     "/undo — remove the last entry\n"
     "/reset — forget the current conversation\n\n"

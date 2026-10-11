@@ -207,6 +207,14 @@ async def recipes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     recipes = await services.repos.recipes.list_recent(limit=25)
     await _reply(update, formatting.format_recipe_list(recipes))
 
+
+async def exercises_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _current_user(update, context)
+    services = _services(context)
+    exercises = await services.repos.exercises.list_all()
+    await _reply(update, formatting.format_exercise_list(exercises))
+
+
 async def exercise_log_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = await _current_user(update, context)
     services = _services(context)
@@ -375,6 +383,7 @@ def register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("target", target_command))
     application.add_handler(CommandHandler("timezone", timezone_command))
     application.add_handler(CommandHandler("recipes", recipes_command))
+    application.add_handler(CommandHandler("exercises", exercises_command))
     application.add_handler(CommandHandler("undo", undo_command))
     application.add_handler(CommandHandler("reset", reset_command))
     application.add_handler(CommandHandler("exercise_log", exercise_log_command))
