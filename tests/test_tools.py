@@ -15,9 +15,18 @@ import pytest
 from pydantic_ai import ModelRetry
 
 from calorie_bot.agent.dependencies import AgentDeps
-from calorie_bot.agent.tools import create_recipe, describe_recipe, get_daily_summary, log_meal
+from calorie_bot.agent.tools import (
+    create_recipe,
+    describe_recipe,
+    get_daily_summary,
+    log_exercise,
+    log_meal,
+)
 from calorie_bot.domain.models import (
     EntrySource,
+    Exercise,
+    ExerciseEntry,
+    ExerciseEntryDraft,
     MealEntry,
     MealEntryDraft,
     MealType,
@@ -100,6 +109,39 @@ class FakeLogRepo:
 
     async def list_for_day(self, user_id, day: date, timezone_name: str):
         return [r for r in self.rows if r.user_id == user_id and r.logged_at.date() == day]
+
+
+class FakeExerciseRepo:
+    def __init__(self) -> None:
+        self.rows: list[Exercise] = []
+
+    async def get(self, exercise_id: UUID):
+        return next((row for row in self.rows if row.exercise_id == exercise_id), None)
+
+    async def search(self, query, limit=5, *, user_id=None):
+        matches = [row for row in self.rows if query.lower() in row.name.lower()]
+        return matches[:limit]
+
+
+class FakeExerciseEntryRepo:
+    def __init__(self) -> None:
+        self.rows: list[ExerciseEntry] = []
+
+    async def create(self, user_id, draft: ExerciseEntryDraft, *, timezone_name="UTC"):
+        entry = ExerciseEntry(
+            entry_id=uuid4(),
+            user=user_id,
+            exercise_id=draft.exercise_id,
+            duration_seconds=draft.duration_seconds,
+            reps=draft.reps,
+            sets=draft.sets,
+            weight=draft.weight,
+            calories_burned=draft.calories_burned,
+            logged_at=draft.logged_at or datetime.now(tz=timezone.utc),
+            created_at=datetime.now(tz=timezone.utc),
+        )
+        self.rows.append(entry)
+        return entry
 
 
 @dataclass
@@ -283,6 +325,47 @@ async def test_future_day_offset_is_refused():
     ctx = make_ctx()
     with pytest.raises(ModelRetry):
         await get_daily_summary(ctx, day_offset=1)
+
+
+@pytest.mark.asyncio
+async def test_log_exercise_resolves_saved_exercise_by_name():
+    ctx = make_ctx()
+    exercise_id = uuid4()
+    exercise = Exercise(exercise_id=exercise_id, name="Bench press")
+    exercise_repo = FakeExerciseRepo()
+    exercise_repo.rows.append(exercise)
+    entry_repo = FakeExerciseEntryRepo()
+    ctx.deps.repos.exercises = exercise_repo
+    ctx.deps.repos.exercise_entries = entry_repo
+
+    entry = await log_exercise(
+        ctx,
+        name="Bench press",
+        duration_seconds=1800,
+        calories_burned=150,
+    )
+
+    assert entry.exercise_id == exercise_id
+    assert entry_repo.rows[0].exercise_id == exercise_id
+
+
+@pytest.mark.asyncio
+async def test_log_exercise_rejects_name_without_saved_match():
+    ctx = make_ctx()
+    exercise_repo = FakeExerciseRepo()
+    entry_repo = FakeExerciseEntryRepo()
+    ctx.deps.repos.exercises = exercise_repo
+    ctx.deps.repos.exercise_entries = entry_repo
+
+    with pytest.raises(ModelRetry, match="No saved exercise matches"):
+        await log_exercise(
+            ctx,
+            name="Bench press",
+            duration_seconds=1800,
+            calories_burned=150,
+        )
+
+    assert entry_repo.rows == []
 
 
 def test_macro_consistency_check():

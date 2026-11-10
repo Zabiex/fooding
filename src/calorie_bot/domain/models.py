@@ -215,7 +215,7 @@ class ExerciseEntryDraft(BaseModel):
     """An exercise log entry as proposed by the agent, before it is persisted."""
 
     user: UUID
-    exercise_id: UUID | None = None
+    exercise_id: UUID
     duration_seconds: float = Field(..., gt=0)
     reps: int | None = Field(None, gt=0)
     sets: int | None = Field(None, gt=0)
@@ -376,5 +376,4 @@ class ExerciseDescription(BaseModel):
     description: str | None = None
     tips: str | None = None
     muscle_groups: list[str] = Field(default_factory=list)
-
 

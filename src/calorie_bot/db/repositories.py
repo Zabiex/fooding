@@ -751,17 +751,25 @@ class ExerciseRepository:
         )
         return [_exercise_from_row(row) for row in rows]
 
-    async def search(self, query: str, limit: int = 5) -> list[Exercise]:
+    async def search(
+        self,
+        query: str,
+        limit: int = 5,
+        *,
+        user_id: UUID | None = None,
+    ) -> list[Exercise]:
         rows = await self._pool.fetch(
             """
             select id, name, description, muscle_group, tips
               from public.exercise
-             where name ilike '%' || $1 || '%' or similarity(name, $1) > 0.2
+             where (name ilike '%' || $1 || '%' or similarity(name, $1) > 0.2)
+               and ($3::uuid is null or user_id = $3)
              order by similarity(name, $1) desc, name asc
              limit $2
             """,
             query,
             limit,
+            user_id,
         )
         return [_exercise_from_row(row) for row in rows]
 

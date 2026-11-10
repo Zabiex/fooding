@@ -33,25 +33,38 @@ async def log_exercise(
         reps: Number of repetitions, if applicable.
         sets: Number of sets, if applicable.
         calories_burned: Estimated calories burned for the entire exercise.
+        exercise_id: Optional id of a saved exercise. If omitted, the exercise is
+            resolved by name from the user's saved exercise catalog.
         hours_ago: How long ago the exercise was performed. 0 means now; 3 means three hours ago.
     """
     deps = ctx.deps
-    resolved_exercise_id: UUID | None = None
 
     if exercise_id:
         try:
             resolved_exercise_id = UUID(exercise_id)
         except ValueError as exc:
             raise ModelRetry(
-                f"'{exercise_id}' is not a valid exercise id. Call describe_exercise to get a real one, "
-                "or omit it and log the exercise by name."
+                f"'{exercise_id}' is not a valid exercise id. Call describe_exercise to get a saved id, "
+                "or omit it to resolve the exercise by name."
             ) from exc
 
         exercise = await deps.repos.exercises.get(resolved_exercise_id)
         if exercise is None:
             raise ModelRetry(
-                f"Exercise with id '{exercise_id}' does not exist. Call describe_exercise first, or log a new exercise."
+                f"Exercise with id '{exercise_id}' does not exist. Call describe_exercise first, "
+                "or save the exercise with create_exercise."
             )
+    else:
+        matches = await deps.repos.exercises.search(
+            name,
+            limit=1,
+            user_id=deps.user_id,
+        )
+        if not matches:
+            raise ModelRetry(
+                f"No saved exercise matches '{name}'. Save it with create_exercise before logging it."
+            )
+        resolved_exercise_id = matches[0].exercise_id
 
     if reps is not None and reps <= 0:
         raise ModelRetry("reps must be greater than zero when provided.")

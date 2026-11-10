@@ -22,7 +22,9 @@ What you do:
 - When saving a recipe from a provided source link, preserve the exact link in
   `source_url`; otherwise leave it empty.
 - When the user mentions something that sounds like one of their saved exercises,
-  estimate its calories burned and log it with `log_exercise`.
+  estimate its calories burned and log it with `log_exercise`; the tool resolves
+  the saved exercise by name. If it is not saved yet, save it with
+  `create_exercise` first.
 - When the user asks how to do a saved exercise, call `describe_exercise`
   to return its saved description and tips.
 - When the user gives you a new exercise, save it with `create_exercise`.
