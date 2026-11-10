@@ -106,7 +106,7 @@ def format_exercise_log_list(exercise_logs: list) -> str:
     for log in exercise_logs:
         name = log.exercise_name or "Exercise"
         lines.append(
-            f"• <b>{e(name)}</b> — {log.duration:.0f} min, "
+            f"• <b>{e(name)}</b> — {log.duration:.0f} sec, "
             f"{log.reps or 0} reps, {log.sets or 0} sets, "
             f"{log.weight or 0:.1f} kg, {log.calories_burned or 0:.0f} kcal burned"
         )
